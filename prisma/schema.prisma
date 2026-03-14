@@ -1,0 +1,180 @@
+// Prisma Schema for Secret Manager Tool
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User - System user
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  name          String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  memberships   ProjectMember[]
+  createdProjects Project[] @relation("ProjectOwner")
+  orgMemberships OrgMember[]
+  auditLogs     AuditLog[]
+  secretVersions SecretVersion[]
+}
+
+// Organization - Team organization
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  projects    Project[]
+  members     OrgMember[]
+}
+
+// Project - Project containing secrets
+model Project {
+  id             String   @id @default(cuid())
+  name           String
+  slug           String
+  orgId          String
+  org            Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  ownerId        String
+  owner          User     @relation("ProjectOwner", fields: [ownerId], references: [id])
+  environments   ProjectEnvironment[]
+  folders        Folder[]
+  secrets        Secret[]
+  members        ProjectMember[]
+  roles          Role[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([orgId, slug])
+}
+
+// ProjectEnvironment - Environment (dev, staging, production)
+model ProjectEnvironment {
+  id        String   @id @default(cuid())
+  name      String   // Development, Staging, Production
+  slug      String   // dev, staging, prod
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  secrets   Secret[]
+  folders   Folder[]
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, slug])
+}
+
+// Folder - Folder containing secrets (can be nested)
+model Folder {
+  id           String   @id @default(cuid())
+  name         String
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  envId        String
+  environment  ProjectEnvironment @relation(fields: [envId], references: [id], onDelete: Cascade)
+  parentId     String?
+  parent       Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id])
+  children     Folder[] @relation("FolderHierarchy")
+  secrets      Secret[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([projectId, envId, parentId, name])
+}
+
+// Secret - Actual secret (encrypted)
+model Secret {
+  id          String   @id @default(cuid())
+  key         String   // Secret name (NOT encrypted for search)
+  value       String   // Encrypted value AES-256-GCM
+  folderId    String
+  folder      Folder   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  envId       String
+  environment ProjectEnvironment @relation(fields: [envId], references: [id], onDelete: Cascade)
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy   String
+  updatedBy   String?
+  version     Int      @default(1)
+  metadata    Json?    // Tags, notes, etc.
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  versions    SecretVersion[]
+
+  @@unique([projectId, envId, folderId, key])
+}
+
+// SecretVersion - Version history of secret
+model SecretVersion {
+  id        String   @id @default(cuid())
+  secretId  String
+  secret    Secret   @relation(fields: [secretId], references: [id], onDelete: Cascade)
+  value     String   // Encrypted value
+  version   Int
+  createdBy String
+  user      User     @relation(fields: [createdBy], references: [id])
+  createdAt DateTime @default(now())
+}
+
+// AuditLog - Activity logs
+model AuditLog {
+  id         String   @id @default(cuid())
+  projectId  String
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String   // created, updated, deleted, viewed, exported
+  targetType String   // secret, folder, project, member
+  targetId   String
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([projectId, createdAt])
+}
+
+// ProjectMember - Project member with role
+model ProjectMember {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  roleId    String
+  role      Role     @relation(fields: [roleId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, projectId])
+}
+
+// Role - Role with permissions
+model Role {
+  id          String   @id @default(cuid())
+  name        String   // Admin, Editor, Viewer
+  slug        String   // admin, editor, viewer
+  permissions Json     // ["secret:read", "secret:write", "member:manage"]
+  isDefault   Boolean  @default(false)
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  members     ProjectMember[]
+
+  @@unique([projectId, slug])
+}
+
+// OrgMember - Organization member
+model OrgMember {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  role      String   // owner, admin, member
+  createdAt DateTime @default(now())
+
+  @@unique([userId, orgId])
+}
