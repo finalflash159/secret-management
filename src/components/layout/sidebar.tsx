@@ -89,16 +89,16 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
       {/* Top Section - Logo & Project Selector */}
       <div className="border-b border-border">
         {/* Logo & Brand */}
-        <div className="flex items-center gap-2 px-3 py-3">
+        <div className="flex items-center gap-3 px-4 py-4">
           <Image
             src="/gondor-logo.png"
             alt="Logo"
-            width={20}
-            height={20}
-            className="rounded-md dark:brightness-0 dark:invert"
+            width={28}
+            height={28}
+            className="rounded-lg dark:brightness-0 dark:invert"
           />
-          <span className="text-sm font-extrabold tracking-tight text-foreground">Gondor</span>
-          <span className="ml-auto rounded px-1.5 py-0.5 text-[9px] font-semibold bg-muted text-muted-foreground">
+          <span className="text-lg font-extrabold tracking-tight text-foreground">Gondor</span>
+          <span className="ml-auto rounded px-2.5 py-1 text-[10px] font-bold bg-gold/20 text-gold">
             FREE
           </span>
         </div>
