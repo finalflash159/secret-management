@@ -8,11 +8,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Modal } from '@/components/ui/modal';
+import { Avatar } from '@/components/ui/avatar';
 
 interface Organization {
   id: string;
   name: string;
   slug: string;
+  avatar?: string | null;
   _count: {
     projects: number;
     members: number;
@@ -187,9 +189,7 @@ export default function OrganizationsPage() {
               <Card className="cursor-pointer bg-card border-border hover:border-border-hover transition-all group">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                      <Image src="/icons/building.svg" alt="Building" width={16} height={16} className="text-muted-foreground" />
-                    </div>
+                    <Avatar src={org.avatar} fallback={org.name.charAt(0).toUpperCase()} size="md" />
                     <Image src="/icons/arrow-right.svg" alt="Arrow" width={14} height={14} className="text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                   </div>
                   <h3 className="text-sm font-semibold text-foreground">{org.name}</h3>
