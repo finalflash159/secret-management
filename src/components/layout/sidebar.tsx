@@ -91,7 +91,7 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
         {/* Logo & Brand */}
         <div className="flex items-center gap-2 px-3 py-3">
           <Image
-            src="/logo.svg"
+            src="/gondor-logo.png"
             alt="Logo"
             width={20}
             height={20}
