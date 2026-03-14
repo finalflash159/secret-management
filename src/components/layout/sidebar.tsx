@@ -91,10 +91,10 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
         {/* Logo & Brand */}
         <div className="flex items-center gap-3 px-4 py-4">
           <Image
-            src="/gondor-logo.png"
+            src="/favicon_io/android-chrome-512x512.png"
             alt="Gondor"
-            width={32}
-            height={32}
+            width={36}
+            height={36}
             className="rounded-lg"
           />
           <span className="text-xl font-extrabold tracking-tight text-foreground">Gondor</span>
