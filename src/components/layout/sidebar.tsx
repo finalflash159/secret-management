@@ -95,7 +95,7 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
             alt="Logo"
             width={20}
             height={20}
-            className="rounded-md"
+            className="rounded-md dark:brightness-0 dark:invert"
           />
           <span className="text-sm font-extrabold tracking-tight text-foreground">Gondor</span>
           <span className="ml-auto rounded px-1.5 py-0.5 text-[9px] font-semibold bg-muted text-muted-foreground">
