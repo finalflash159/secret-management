@@ -2,18 +2,10 @@
 
 export default function Loading() {
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="h-6 w-48 bg-muted rounded animate-pulse" />
-          <div className="h-4 w-64 bg-muted rounded animate-pulse mt-2" />
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <div key={i} className="h-32 bg-card rounded-lg border border-border p-4 animate-pulse" />
-        ))}
+    <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <span className="text-sm text-muted-foreground">Loading...</span>
       </div>
     </div>
   );

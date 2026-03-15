@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSession } from '@/components/session-provider';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -15,12 +15,26 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
   const { user, loading } = useSession();
   const [unreadAlerts, setUnreadAlerts] = useState(0);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const prevPathRef = useRef(pathname);
 
   // Extract org slug from pathname
   const segments = pathname.split('/').filter(Boolean);
   const currentOrgSlug = segments[1] || null;
 
-  // Fetch unread alert count
+  // Detect navigation to show skeleton
+  useEffect(() => {
+    if (prevPathRef.current !== pathname) {
+      setIsNavigating(true);
+      const timer = setTimeout(() => {
+        setIsNavigating(false);
+        prevPathRef.current = pathname;
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [pathname]);
+
+  // Fetch unread alert count only once on initial load
   useEffect(() => {
     async function fetchAlertCount() {
       if (!user?.id) return;
@@ -35,7 +49,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       }
     }
     fetchAlertCount();
-  }, [user?.id, pathname]); // Refresh on navigation
+  }, [user?.id]);
 
   // Redirect to login if not authenticated - use useEffect to avoid render-time redirect
   useEffect(() => {
