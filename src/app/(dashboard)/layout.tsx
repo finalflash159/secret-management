@@ -1,15 +1,10 @@
 'use client';
 
 import { ReactNode, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
+import { useSession } from '@/components/session-provider';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
-
-interface User {
-  id: string;
-  email: string;
-  name?: string | null;
-}
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -17,31 +12,40 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const pathname = usePathname();
+  const { user, loading } = useSession();
+  const [unreadAlerts, setUnreadAlerts] = useState(0);
 
+  // Extract org slug from pathname
+  const segments = pathname.split('/').filter(Boolean);
+  const currentOrgSlug = segments[1] || null;
+
+  // Fetch unread alert count
   useEffect(() => {
-    const fetchSession = async () => {
+    async function fetchAlertCount() {
+      if (!user?.id) return;
       try {
-        const res = await fetch('/api/auth/session');
-        const data = await res.json();
-        if (!data.user) {
-          router.push('/login');
-        } else {
-          setUser(data.user);
+        const res = await fetch('/api/alerts/unread-count');
+        const json = await res.json();
+        if (json?.data?.count !== undefined) {
+          setUnreadAlerts(json.data.count);
         }
-      } catch {
-        router.push('/login');
-      } finally {
-        setLoading(false);
+      } catch (err) {
+        console.error('Failed to fetch alert count:', err);
       }
-    };
+    }
+    fetchAlertCount();
+  }, [user?.id, pathname]); // Refresh on navigation
 
-    fetchSession();
-  }, [router]);
+  // Redirect to login if not authenticated - use useEffect to avoid render-time redirect
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [loading, user, router]);
 
-  if (loading) {
+  // Show loading only on initial load
+  if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
@@ -52,22 +56,21 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     );
   }
 
-  if (!user) return null;
-
   return (
     <div className="min-h-screen bg-background">
       <Sidebar
         user={user}
-        collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        collapsed={false}
+        organizationSlug={currentOrgSlug}
+        unreadAlerts={unreadAlerts}
       />
-      <Header user={user} sidebarCollapsed={sidebarCollapsed} />
-
-      <main
-        className={`pt-[52px] transition-all duration-300 ${
-          sidebarCollapsed ? 'pl-14' : 'pl-[220px]'
-        }`}
-      >
+      <Header
+        user={user}
+        sidebarCollapsed={false}
+        organizationSlug={currentOrgSlug}
+        unreadAlerts={unreadAlerts}
+      />
+      <main className="pt-[52px] pl-[220px]">
         <div className="p-6">{children}</div>
       </main>
     </div>

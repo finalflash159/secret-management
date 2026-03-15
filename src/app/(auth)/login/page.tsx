@@ -1,21 +1,45 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { signIn } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FolderKey } from 'lucide-react';
+import { Logo } from '@/components/logo';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Only run on client
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Check if already authenticated
+  useEffect(() => {
+    if (!mounted) return;
+
+    const checkSession = async () => {
+      try {
+        const res = await fetch('/api/auth/session');
+        const data = await res.json();
+        if (data.user) {
+          setIsAuthenticated(true);
+          window.location.href = '/organizations';
+        }
+      } catch {
+        // ignore
+      }
+    };
+    checkSession();
+  }, [mounted]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,8 +56,8 @@ export default function LoginPage() {
       if (result?.error) {
         setError('Invalid email or password');
       } else {
-        router.push('/organizations');
-        router.refresh();
+        // Use window.location for reliable redirect
+        window.location.href = '/organizations';
       }
     } catch {
       setError('An error occurred. Please try again.');
@@ -42,15 +66,21 @@ export default function LoginPage() {
     }
   };
 
+  // Show loading while checking session
+  if (!mounted || isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--background)]">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--background)] p-4">
       <div className="w-full max-w-sm">
         {/* Logo */}
-        <div className="flex items-center justify-center gap-2 mb-6">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[var(--primary)]">
-            <FolderKey className="h-4 w-4 text-[var(--primary-foreground)]" />
-          </div>
-          <span className="font-semibold text-[var(--foreground)] text-sm">Secret Manager</span>
+        <div className="flex items-center justify-center mb-6">
+          <Logo width={140} height={48} />
         </div>
 
         <Card>

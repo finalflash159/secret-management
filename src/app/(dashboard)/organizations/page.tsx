@@ -38,11 +38,14 @@ export default function OrganizationsPage() {
     try {
       const res = await fetch('/api/organizations');
       if (res.ok) {
-        const data = await res.json();
-        setOrganizations(data);
+        const json = await res.json();
+        // Handle both wrapped { data: [...] } and unwrapped [...] response
+        const data = json?.data ?? json;
+        setOrganizations(Array.isArray(data) ? data : []);
       }
     } catch (err) {
       console.error('Failed to fetch organizations:', err);
+      setOrganizations([]);
     } finally {
       setLoading(false);
     }
@@ -87,8 +90,8 @@ export default function OrganizationsPage() {
     setNewOrgSlug(generateSlug(name));
   };
 
-  const totalProjects = organizations.reduce((sum, org) => sum + org._count.projects, 0);
-  const totalMembers = organizations.reduce((sum, org) => sum + org._count.members, 0);
+  const totalProjects = organizations.reduce((sum, org) => sum + (org._count?.projects ?? 0), 0);
+  const totalMembers = organizations.reduce((sum, org) => sum + (org._count?.members ?? 0), 0);
 
   if (loading) {
     return (
@@ -189,7 +192,7 @@ export default function OrganizationsPage() {
               <Card className="cursor-pointer bg-card border-border hover:border-border-hover transition-all group">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-3">
-                    <Avatar src={org.avatar} fallback={org.name.charAt(0).toUpperCase()} size="md" />
+                    <Avatar src={org.avatar || undefined} fallback={org.name.charAt(0).toUpperCase()} size="md" />
                     <Image src="/icons/arrow-right.svg" alt="Arrow" width={14} height={14} className="text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                   </div>
                   <h3 className="text-sm font-semibold text-foreground">{org.name}</h3>

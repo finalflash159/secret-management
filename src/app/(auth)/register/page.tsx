@@ -1,13 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FolderKey } from 'lucide-react';
+import { Logo } from '@/components/logo';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -17,14 +17,6 @@ export default function RegisterPage() {
   const [inviteCode, setInviteCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [requireInvite, setRequireInvite] = useState(false);
-
-  useEffect(() => {
-    // Check if invite is required
-    fetch('/api/auth/register', { method: 'HEAD' })
-      .then(() => {})
-      .catch(() => {});
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,11 +50,8 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-[var(--background)] p-4">
       <div className="w-full max-w-sm">
         {/* Logo */}
-        <div className="flex items-center justify-center gap-2 mb-6">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[var(--primary)]">
-            <FolderKey className="h-4 w-4 text-[var(--primary-foreground)]" />
-          </div>
-          <span className="font-semibold text-[var(--foreground)] text-sm">Secret Manager</span>
+        <div className="flex items-center justify-center mb-6">
+          <Logo width={140} height={48} />
         </div>
 
         <Card>
