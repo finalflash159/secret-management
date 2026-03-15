@@ -22,6 +22,7 @@ model User {
   orgMemberships OrgMember[]
   auditLogs     AuditLog[]
   secretVersions SecretVersion[]
+  alerts        Alert[]
 }
 
 // Organization - Team organization
@@ -34,6 +35,7 @@ model Organization {
   updatedAt   DateTime @updatedAt
   projects    Project[]
   members     OrgMember[]
+  alerts      Alert[]
 }
 
 // Project - Project containing secrets
@@ -50,6 +52,7 @@ model Project {
   secrets        Secret[]
   members        ProjectMember[]
   roles          Role[]
+  alerts         Alert[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -90,21 +93,22 @@ model Folder {
 
 // Secret - Actual secret (encrypted)
 model Secret {
-  id          String   @id @default(cuid())
-  key         String   // Secret name (NOT encrypted for search)
-  value       String   // Encrypted value AES-256-GCM
+  id          String    @id @default(cuid())
+  key         String    // Secret name (NOT encrypted for search)
+  value       String    // Encrypted value AES-256-GCM
   folderId    String
-  folder      Folder   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  folder      Folder    @relation(fields: [folderId], references: [id], onDelete: Cascade)
   envId       String
   environment ProjectEnvironment @relation(fields: [envId], references: [id], onDelete: Cascade)
   projectId   String
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   createdBy   String
   updatedBy   String?
-  version     Int      @default(1)
-  metadata    Json?    // Tags, notes, etc.
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  version     Int       @default(1)
+  expiresAt   DateTime? // Expiration date for the secret
+  metadata    Json?     // Tags, notes, etc.
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   versions    SecretVersion[]
 
   @@unique([projectId, envId, folderId, key])
@@ -178,4 +182,47 @@ model OrgMember {
   createdAt DateTime @default(now())
 
   @@unique([userId, orgId])
+}
+
+// Alert - User notifications and alerts
+model Alert {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orgId       String?
+  org         Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  projectId   String?
+  project     Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Alert content
+  type        AlertType // info, warning, error, success, secret_expiry, security
+  title       String
+  message     String
+  link        String?   // Optional link to related entity
+
+  // Status
+  read        Boolean   @default(false)
+  readAt      DateTime?
+
+  // Metadata
+  metadata    Json?     // Additional data like secret name, expiry date, etc.
+
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, read, createdAt])
+  @@index([orgId, createdAt])
+}
+
+enum AlertType {
+  info        // General information
+  warning     // Warnings
+  error       // Errors
+  success     // Success messages
+  secret_expiry    // Secret expiring soon
+  secret_expired   // Secret expired
+  security    // Security alerts
+  member_added      // New member added
+  member_removed   // Member removed
+  access_granted    // Access granted
+  access_revoked    // Access revoked
 }
