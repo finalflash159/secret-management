@@ -1,11 +1,13 @@
 'use client';
 
+import { memo, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
+import { signOut } from 'next-auth/react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { ChevronDown, Settings, Users, LogOut, Key, RefreshCw, FolderOpen, Plug, Shield, FileText, Bell, CreditCard } from 'lucide-react';
+import { Settings, Users, LogOut, Key, RefreshCw, FolderOpen, Plug, Shield, FileText, Bell, CreditCard } from 'lucide-react';
 
 interface UserData {
   id: string;
@@ -16,7 +18,8 @@ interface UserData {
 interface SidebarProps {
   user: UserData | null;
   collapsed?: boolean;
-  onToggle?: () => void;
+  organizationSlug?: string | null;
+  unreadAlerts?: number;
 }
 
 interface NavItem {
@@ -31,53 +34,55 @@ interface NavGroup {
   items: NavItem[];
 }
 
-export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
+function SidebarComponent({ user, collapsed = false, organizationSlug, unreadAlerts = 0 }: SidebarProps) {
   const pathname = usePathname();
 
-  const navGroups: NavGroup[] = [
+  // Build base href based on org slug
+  const baseHref = organizationSlug ? `/organizations/${organizationSlug}` : '/organizations';
+
+  // Memoize nav groups with dynamic hrefs
+  const navGroups = useMemo<NavGroup[]>(() => [
     {
       label: 'Project',
       items: [
-        { label: 'Secrets', href: '/organizations', icon: <Key className="h-4 w-4" /> },
-        { label: 'Dynamic Secrets', href: '#', icon: <RefreshCw className="h-4 w-4" /> },
-        { label: 'Secret Rotation', href: '#', icon: <RefreshCw className="h-4 w-4" />, badge: 'New' },
-        { label: 'Folders', href: '#', icon: <FolderOpen className="h-4 w-4" /> },
-        { label: 'Integrations', href: '#', icon: <Plug className="h-4 w-4" /> },
+        { label: 'Secrets', href: baseHref, icon: <Key className="h-4 w-4" /> },
+        { label: 'Dynamic Secrets', href: `${baseHref}/dynamic-secrets`, icon: <RefreshCw className="h-4 w-4" /> },
+        { label: 'Secret Rotation', href: `${baseHref}/secret-rotation`, icon: <RefreshCw className="h-4 w-4" />, badge: 'New' },
+        { label: 'Folders', href: `${baseHref}/folders`, icon: <FolderOpen className="h-4 w-4" /> },
+        { label: 'Integrations', href: `${baseHref}/integrations`, icon: <Plug className="h-4 w-4" /> },
       ],
     },
     {
       label: 'Security',
       items: [
-        { label: 'Access Control', href: '#', icon: <Shield className="h-4 w-4" /> },
-        { label: 'Audit Logs', href: '#', icon: <FileText className="h-4 w-4" /> },
-        { label: 'Alerts', href: '#', icon: <Bell className="h-4 w-4" />, badge: '2' },
+        { label: 'Access Control', href: `${baseHref}/access-control`, icon: <Shield className="h-4 w-4" /> },
+        { label: 'Audit Logs', href: `${baseHref}/audit-logs`, icon: <FileText className="h-4 w-4" /> },
+        { label: 'Alerts', href: `${baseHref}/alerts`, icon: <Bell className="h-4 w-4" />, badge: unreadAlerts > 0 ? unreadAlerts : undefined },
       ],
     },
     {
       label: 'Settings',
       items: [
-        { label: 'Project Settings', href: '#', icon: <Settings className="h-4 w-4" /> },
-        { label: 'Members', href: '#', icon: <Users className="h-4 w-4" /> },
-        { label: 'Billing', href: '#', icon: <CreditCard className="h-4 w-4" /> },
+        { label: 'Project Settings', href: `${baseHref}/settings`, icon: <Settings className="h-4 w-4" /> },
+        { label: 'Members', href: `${baseHref}/members`, icon: <Users className="h-4 w-4" /> },
+        { label: 'Billing', href: `${baseHref}/billing`, icon: <CreditCard className="h-4 w-4" /> },
       ],
     },
-  ];
+  ], [baseHref, unreadAlerts]);
 
-  const isActive = (href: string) => {
-    if (href === '/organizations') {
-      return pathname === '/organizations';
-    }
-    return pathname.startsWith(href);
-  };
+  const isActive = useCallback((href: string) => {
+    // Exact match only - prevent multiple active items
+    return pathname === href;
+  }, [pathname]);
 
-  const getInitials = (name: string) => {
+  const getInitials = useCallback((name: string) => {
     return name
       .split(' ')
       .map((n) => n[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
-  };
+  }, []);
 
   return (
     <aside
@@ -120,6 +125,7 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
                   <Link
                     key={item.label}
                     href={item.href || '#'}
+                    prefetch={true}
                     className={cn(
                       'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium transition-all relative',
                       active
@@ -185,17 +191,23 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
 
         {/* Settings & Sign out */}
         <div className={cn('mt-2 space-y-0.5', collapsed && 'flex flex-col items-center')}>
-          <button className={cn(
-            'flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground',
-            collapsed && 'justify-center px-1.5'
-          )}>
+          <Link
+            href={organizationSlug ? `/organizations/${organizationSlug}/settings` : '/organizations'}
+            className={cn(
+              'flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground',
+              collapsed && 'justify-center px-1.5'
+            )}
+          >
             <Settings className="h-4 w-4" />
             {!collapsed && <span>Settings</span>}
-          </button>
-          <button className={cn(
-            'flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground',
-            collapsed && 'justify-center px-1.5'
-          )}>
+          </Link>
+          <button
+            onClick={() => signOut({ redirect: true, callbackUrl: '/login' })}
+            className={cn(
+              'flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground',
+              collapsed && 'justify-center px-1.5'
+            )}
+          >
             <LogOut className="h-4 w-4" />
             {!collapsed && <span>Sign out</span>}
           </button>
@@ -204,3 +216,7 @@ export function Sidebar({ user, collapsed = false, onToggle }: SidebarProps) {
     </aside>
   );
 }
+
+// Export memoized version
+const Sidebar = memo(SidebarComponent);
+export { Sidebar };
