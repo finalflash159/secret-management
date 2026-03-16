@@ -31,7 +31,7 @@ export default function SettingsPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   const handleDeleteOrg = async () => {
-    if (deleteConfirmText !== organization?.name) return;
+    if (deleteConfirmText !== organization?.slug) return;
 
     setDeleting(true);
     try {
@@ -234,13 +234,13 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="confirmDelete">
-              Type <span className="font-mono font-bold">{organization?.name}</span> to confirm
+              Type <span className="font-mono font-bold">{organization?.slug || 'your-org-slug'}</span> to confirm
             </Label>
             <Input
               id="confirmDelete"
               value={deleteConfirmText}
               onChange={(e) => setDeleteConfirmText(e.target.value)}
-              placeholder={organization?.name}
+              placeholder={organization?.slug ? `e.g. ${organization.slug}` : 'your-org-slug'}
             />
           </div>
           <div className="flex justify-end gap-2">
@@ -255,7 +255,7 @@ export default function SettingsPage() {
             <Button
               variant="danger"
               size="sm"
-              disabled={deleteConfirmText !== organization?.name || deleting}
+              disabled={deleteConfirmText !== organization?.slug || deleting}
               onClick={handleDeleteOrg}
             >
               {deleting ? (

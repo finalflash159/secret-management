@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,7 @@ interface Organization {
 }
 
 export default function OrganizationsPage() {
+  const searchParams = useSearchParams();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -29,6 +31,14 @@ export default function OrganizationsPage() {
   const [newOrgName, setNewOrgName] = useState('');
   const [newOrgSlug, setNewOrgSlug] = useState('');
   const [error, setError] = useState('');
+
+  // Check for create query param
+  useEffect(() => {
+    const createParam = searchParams.get('create');
+    if (createParam === 'true') {
+      setShowCreateModal(true);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     fetchOrganizations();
@@ -205,7 +215,7 @@ export default function OrganizationsPage() {
         </div>
       )}
 
-      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="New Organization">
+      <Modal isOpen={showCreateModal} onClose={() => { setShowCreateModal(false); window.history.replaceState({}, '', '/organizations'); }} title="New Organization">
         <form onSubmit={handleCreateOrg} className="space-y-4">
           {error && (
             <div className="rounded-md bg-danger/10 p-2.5 text-sm text-danger border border-danger/20">

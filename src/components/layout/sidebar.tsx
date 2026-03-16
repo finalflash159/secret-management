@@ -1,18 +1,25 @@
 'use client';
 
-import { memo, useMemo, useCallback } from 'react';
+import { memo, useMemo, useCallback, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Logo } from '@/components/logo';
-import { Settings, Users, LogOut, Key, RefreshCw, FolderOpen, Plug, Shield, FileText, Bell, CreditCard } from 'lucide-react';
+import { Settings, Users, LogOut, Key, RefreshCw, FolderOpen, Plug, Shield, FileText, Bell, CreditCard, Building2, ChevronDown, Plus, Loader2 } from 'lucide-react';
 
 interface UserData {
   id: string;
   email: string;
   name?: string | null;
+}
+
+interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  avatar?: string | null;
 }
 
 interface SidebarProps {
@@ -36,46 +43,88 @@ interface NavGroup {
 
 function SidebarComponent({ user, collapsed = false, organizationSlug, unreadAlerts = 0 }: SidebarProps) {
   const pathname = usePathname();
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [loadingOrgs, setLoadingOrgs] = useState(false);
+  const [showOrgDropdown, setShowOrgDropdown] = useState(false);
+
+  // Fetch organizations on mount
+  useEffect(() => {
+    async function fetchOrgs() {
+      setLoadingOrgs(true);
+      try {
+        const res = await fetch('/api/organizations');
+        if (res.ok) {
+          const json = await res.json();
+          const data = json?.data ?? json;
+          setOrganizations(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch organizations:', err);
+      } finally {
+        setLoadingOrgs(false);
+      }
+    }
+    if (!organizationSlug) {
+      fetchOrgs();
+    }
+  }, [organizationSlug]);
+
+  // Find current org
+  const currentOrg = useMemo(() => {
+    return organizations.find(org => org.slug === organizationSlug);
+  }, [organizations, organizationSlug]);
 
   // Build base href based on org slug
   const baseHref = organizationSlug ? `/organizations/${organizationSlug}` : '/organizations';
 
-  // Memoize nav groups with dynamic hrefs
-  const navGroups = useMemo<NavGroup[]>(() => [
-    {
-      label: 'Project',
-      items: [
-        { label: 'Secrets', href: baseHref, icon: <Key className="h-4 w-4" /> },
-        { label: 'Dynamic Secrets', href: `${baseHref}/dynamic-secrets`, icon: <RefreshCw className="h-4 w-4" /> },
-        { label: 'Secret Rotation', href: `${baseHref}/secret-rotation`, icon: <RefreshCw className="h-4 w-4" />, badge: 'New' },
-        { label: 'Folders', href: `${baseHref}/folders`, icon: <FolderOpen className="h-4 w-4" /> },
-        { label: 'Integrations', href: `${baseHref}/integrations`, icon: <Plug className="h-4 w-4" /> },
-      ],
-    },
-    {
-      label: 'Security',
-      items: [
-        { label: 'Access Control', href: `${baseHref}/access-control`, icon: <Shield className="h-4 w-4" /> },
-        { label: 'Audit Logs', href: `${baseHref}/audit-logs`, icon: <FileText className="h-4 w-4" /> },
-        { label: 'Alerts', href: `${baseHref}/alerts`, icon: <Bell className="h-4 w-4" />, badge: unreadAlerts > 0 ? unreadAlerts : undefined },
-      ],
-    },
-    {
-      label: 'Settings',
-      items: [
-        { label: 'Project Settings', href: `${baseHref}/settings`, icon: <Settings className="h-4 w-4" /> },
-        { label: 'Members', href: `${baseHref}/members`, icon: <Users className="h-4 w-4" /> },
-        { label: 'Billing', href: `${baseHref}/billing`, icon: <CreditCard className="h-4 w-4" /> },
-      ],
-    },
-  ], [baseHref, unreadAlerts]);
+  // Only show navigation when org is selected
+  const navGroups = useMemo<NavGroup[]>(() => {
+    if (!organizationSlug) return [];
+
+    return [
+      {
+        label: 'Project',
+        items: [
+          { label: 'Secrets', href: baseHref, icon: <Key className="h-4 w-4" /> },
+          { label: 'Dynamic Secrets', href: `${baseHref}/dynamic-secrets`, icon: <RefreshCw className="h-4 w-4" /> },
+          { label: 'Secret Rotation', href: `${baseHref}/secret-rotation`, icon: <RefreshCw className="h-4 w-4" />, badge: 'New' },
+          { label: 'Folders', href: `${baseHref}/folders`, icon: <FolderOpen className="h-4 w-4" /> },
+          { label: 'Integrations', href: `${baseHref}/integrations`, icon: <Plug className="h-4 w-4" /> },
+        ],
+      },
+      {
+        label: 'Security',
+        items: [
+          { label: 'Access Control', href: `${baseHref}/access-control`, icon: <Shield className="h-4 w-4" /> },
+          { label: 'Audit Logs', href: `${baseHref}/audit-logs`, icon: <FileText className="h-4 w-4" /> },
+          { label: 'Alerts', href: `${baseHref}/alerts`, icon: <Bell className="h-4 w-4" />, badge: unreadAlerts > 0 ? unreadAlerts : undefined },
+        ],
+      },
+      {
+        label: 'Settings',
+        items: [
+          { label: 'Settings', href: `${baseHref}/settings`, icon: <Settings className="h-4 w-4" /> },
+          { label: 'Members', href: `${baseHref}/members`, icon: <Users className="h-4 w-4" /> },
+          { label: 'Billing', href: `${baseHref}/billing`, icon: <CreditCard className="h-4 w-4" /> },
+        ],
+      },
+    ];
+  }, [baseHref, unreadAlerts, organizationSlug]);
 
   const isActive = useCallback((href: string) => {
-    // Exact match only - prevent multiple active items
     return pathname === href;
   }, [pathname]);
 
   const getInitials = useCallback((name: string) => {
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  }, []);
+
+  const getOrgInitials = useCallback((name: string) => {
     return name
       .split(' ')
       .map((n) => n[0])
@@ -91,7 +140,7 @@ function SidebarComponent({ user, collapsed = false, organizationSlug, unreadAle
         collapsed ? 'w-14' : 'w-[220px]'
       )}
     >
-      {/* Top Section - Logo & Project Selector */}
+      {/* Top Section - Logo & Org Selector */}
       <div className="border-b border-border">
         {/* Logo & Brand */}
         <div className="flex items-center gap-3 px-4 py-4">
@@ -99,64 +148,182 @@ function SidebarComponent({ user, collapsed = false, organizationSlug, unreadAle
           <span className="text-lg font-extrabold tracking-tight text-foreground">Gondor</span>
         </div>
 
+        {/* Organization Selector */}
+        {!collapsed && (
+          <div className="px-2 pb-3">
+            <div className="relative">
+              <button
+                onClick={() => setShowOrgDropdown(!showOrgDropdown)}
+                className={cn(
+                  'w-full flex items-center gap-2 px-2 py-2 rounded-md border border-border bg-background/50',
+                  'hover:bg-muted transition-colors text-left'
+                )}
+              >
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-xs font-bold text-primary">
+                  {currentOrg ? getOrgInitials(currentOrg.name) : <Building2 className="h-4 w-4" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {currentOrg ? currentOrg.name : 'Select Org'}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground truncate">
+                    {currentOrg ? currentOrg.slug : 'Choose an organization'}
+                  </p>
+                </div>
+                <ChevronDown className={cn('h-4 w-4 text-muted-foreground shrink-0 transition-transform', showOrgDropdown && 'rotate-180')} />
+              </button>
+
+              {/* Org Dropdown */}
+              {showOrgDropdown && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowOrgDropdown(false)} />
+                  <div className="absolute top-full left-0 right-0 mt-1 z-50 rounded-md border border-border bg-card shadow-lg overflow-hidden">
+                    <div className="max-h-[200px] overflow-y-auto">
+                      {loadingOrgs ? (
+                        <div className="px-3 py-4 text-center text-sm text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin mx-auto mb-1" />
+                          Loading...
+                        </div>
+                      ) : organizations.length === 0 ? (
+                        <div className="px-3 py-4 text-center text-sm text-muted-foreground">
+                          No organizations
+                        </div>
+                      ) : (
+                        organizations.map((org) => (
+                          <Link
+                            key={org.id}
+                            href={`/organizations/${org.slug}`}
+                            onClick={() => setShowOrgDropdown(false)}
+                            className={cn(
+                              'flex items-center gap-2 px-3 py-2 hover:bg-muted transition-colors',
+                              org.slug === organizationSlug && 'bg-muted'
+                            )}
+                          >
+                            <div className="flex h-6 w-6 items-center justify-center rounded bg-primary/10 text-[10px] font-bold text-primary">
+                              {getOrgInitials(org.name)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">{org.name}</p>
+                              <p className="text-[10px] text-muted-foreground truncate">/{org.slug}</p>
+                            </div>
+                          </Link>
+                        ))
+                      )}
+                    </div>
+                    <div className="border-t border-border">
+                      <Link
+                        href="/organizations?create=true"
+                        onClick={() => setShowOrgDropdown(false)}
+                        className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Create New Org
+                      </Link>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-2">
-        {navGroups.map((group) => (
-          <div key={group.label} className="mb-4">
-            {!collapsed && (
-              <div className="px-2 py-2">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  {group.label}
-                </span>
+        {!organizationSlug ? (
+          <div className="space-y-2">
+            <p className="px-2 text-xs text-muted-foreground font-medium">Your Organizations</p>
+            {loadingOrgs ? (
+              <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin mx-auto mb-1" />
               </div>
-            )}
-            <div className="space-y-0.5">
-              {group.items.map((item) => {
-                const active = item.href && isActive(item.href);
-                return (
+            ) : organizations.length === 0 ? (
+              <div className="px-2 py-4 text-center">
+                <p className="text-sm text-muted-foreground mb-2">No organizations yet</p>
+                <Link
+                  href="/organizations?create=true"
+                  className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                >
+                  <Plus className="h-3 w-3" />
+                  Create your first organization
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                {organizations.map((org) => (
                   <Link
-                    key={item.label}
-                    href={item.href || '#'}
-                    prefetch={true}
+                    key={org.id}
+                    href={`/organizations/${org.slug}`}
                     className={cn(
-                      'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium transition-all relative',
-                      active
-                        ? 'bg-muted text-foreground'
-                        : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                      collapsed && 'justify-center px-1.5'
+                      'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium transition-all',
+                      'text-muted-foreground hover:bg-muted hover:text-foreground'
                     )}
                   >
-                    {active && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 bg-primary rounded-full" />
-                    )}
-                    <span className={cn('h-4 w-4 shrink-0', active && 'text-foreground')}>
-                      {item.icon}
-                    </span>
-                    {!collapsed && (
-                      <>
-                        <span>{item.label}</span>
-                        {item.badge && (
-                          <span
-                            className={cn(
-                              'ml-auto rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
-                              typeof item.badge === 'number'
-                                ? 'bg-muted text-muted-foreground'
-                                : 'bg-gold/20 text-gold'
-                            )}
-                          >
-                            {item.badge}
-                          </span>
-                        )}
-                      </>
-                    )}
+                    <div className="flex h-6 w-6 items-center justify-center rounded bg-primary/10 text-[9px] font-bold text-primary">
+                      {getOrgInitials(org.name)}
+                    </div>
+                    <span className="truncate">{org.name}</span>
                   </Link>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
-        ))}
+        ) : (
+          navGroups.map((group) => (
+            <div key={group.label} className="mb-4">
+              {!collapsed && (
+                <div className="px-2 py-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    {group.label}
+                  </span>
+                </div>
+              )}
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const active = item.href && isActive(item.href);
+                  return (
+                    <Link
+                      key={item.label}
+                      href={item.href || '#'}
+                      prefetch={true}
+                      className={cn(
+                        'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium transition-all relative',
+                        active
+                          ? 'bg-muted text-foreground'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                        collapsed && 'justify-center px-1.5'
+                      )}
+                    >
+                      {active && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 bg-primary rounded-full" />
+                      )}
+                      <span className={cn('h-4 w-4 shrink-0', active && 'text-foreground')}>
+                        {item.icon}
+                      </span>
+                      {!collapsed && (
+                        <>
+                          <span>{item.label}</span>
+                          {item.badge && (
+                            <span
+                              className={cn(
+                                'ml-auto rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
+                                typeof item.badge === 'number'
+                                  ? 'bg-muted text-muted-foreground'
+                                  : 'bg-gold/20 text-gold'
+                              )}
+                            >
+                              {item.badge}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))
+        )}
       </nav>
 
       {/* Bottom Section - User & Settings */}

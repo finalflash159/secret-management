@@ -187,42 +187,47 @@ function HeaderComponent({ user, sidebarCollapsed = false, organizationSlug, unr
 
         {/* Right Actions */}
         <div className="flex items-center gap-2">
-          {/* Import .env */}
-          <button
-            onClick={handleImportClick}
-            className="flex items-center gap-1.5 rounded-md border border-border bg-transparent px-3 py-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <Upload className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Import .env</span>
-          </button>
+          {/* Only show these actions when org is selected */}
+          {organizationSlug && (
+            <>
+              {/* Import .env */}
+              <button
+                onClick={handleImportClick}
+                className="flex items-center gap-1.5 rounded-md border border-border bg-transparent px-3 py-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <Upload className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Import .env</span>
+              </button>
 
-          {/* Export */}
-          <button
-            onClick={handleExportClick}
-            className="flex items-center gap-1.5 rounded-md border border-border bg-transparent px-3 py-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <Download className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Export</span>
-          </button>
+              {/* Export */}
+              <button
+                onClick={handleExportClick}
+                className="flex items-center gap-1.5 rounded-md border border-border bg-transparent px-3 py-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Export</span>
+              </button>
 
-          {/* Add Secret */}
-          <button
-            onClick={handleAddSecretClick}
-            className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:opacity-90"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Add Secret</span>
-          </button>
+              {/* Add Secret */}
+              <button
+                onClick={handleAddSecretClick}
+                className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:opacity-90"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add Secret</span>
+              </button>
 
-          {/* Divider */}
-          <div className="h-5 w-px bg-border mx-1" />
+              {/* Divider */}
+              <div className="h-5 w-px bg-border mx-1" />
+            </>
+          )}
 
           {/* Theme Toggle */}
           <ThemeToggle />
 
-          {/* Notifications */}
+          {/* Notifications - show global alerts for all orgs */}
           <Link
-            href={organizationSlug ? `/organizations/${organizationSlug}/alerts` : '/organizations/alerts'}
+            href="/alerts"
             className="relative flex h-8 w-8 items-center justify-center rounded-md border border-border bg-transparent text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <Bell className="h-4 w-4" />
