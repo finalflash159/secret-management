@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,8 @@ import {
   ChevronRight,
   RefreshCw,
   X,
+  AlertTriangle,
+  Loader2,
 } from 'lucide-react';
 
 interface Environment {
@@ -63,6 +65,7 @@ interface AuditEntry {
 
 export default function ProjectSecretsPage() {
   const params = useParams();
+  const router = useRouter();
   const projectId = params.projectId as string;
   const slug = params.slug as string;
 
@@ -96,6 +99,10 @@ export default function ProjectSecretsPage() {
   const [error, setError] = useState('');
   const [integrations] = useState<{id: string; name: string; connected: boolean}[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([]);
+  const [projectName, setProjectName] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   // Fetch audit logs for selected secret
   useEffect(() => {
@@ -166,10 +173,17 @@ export default function ProjectSecretsPage() {
 
   const fetchProjectData = async () => {
     try {
-      const [envsRes, foldersRes] = await Promise.all([
+      const [projectRes, envsRes, foldersRes] = await Promise.all([
+        fetch(`/api/projects/${projectId}`),
         fetch(`/api/projects/${projectId}/environments`),
         fetch(`/api/projects/${projectId}/folders`),
       ]);
+
+      if (projectRes.ok) {
+        const projectJson = await projectRes.json();
+        const project = projectJson.data || projectJson;
+        setProjectName(project.name);
+      }
 
       if (envsRes.ok) {
         const envsJson = await envsRes.json();
@@ -360,6 +374,25 @@ export default function ProjectSecretsPage() {
       }
     } catch {
       setError('Failed to delete environment');
+    }
+  };
+
+  const handleDeleteProject = async () => {
+    if (deleteConfirmText !== projectName) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        router.push(`/organizations/${slug}`);
+      }
+    } catch (err) {
+      console.error('Failed to delete project:', err);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -996,6 +1029,32 @@ export default function ProjectSecretsPage() {
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </div>
           </div>
+
+          {/* Danger Zone */}
+          <div className="border-t border-border pt-4 mt-4">
+            <h3 className="text-sm font-semibold text-danger mb-3 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              Danger Zone
+            </h3>
+            <div className="rounded-lg border border-danger/20 bg-danger/5 p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Delete Project</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Once deleted, all secrets will be permanently lost.
+                  </p>
+                </div>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => setShowDeleteModal(true)}
+                >
+                  <Trash2 className="h-4 w-4 mr-1.5" />
+                  Delete
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       </Modal>
 
@@ -1043,6 +1102,60 @@ export default function ProjectSecretsPage() {
             {teamMembers.length === 0 && (
               <p className="text-xs text-muted-foreground py-2">No members yet</p>
             )}
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Project Confirmation Modal */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => { setShowDeleteModal(false); setDeleteConfirmText(''); }}
+        title="Delete Project"
+      >
+        <div className="space-y-4">
+          <div className="rounded-md bg-danger/10 p-3 border border-danger/20">
+            <p className="text-sm text-danger font-medium">
+              This action cannot be undone.
+            </p>
+            <p className="text-xs text-danger/80 mt-1">
+              All secrets and data associated with this project will be permanently deleted.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirmDelete">
+              Type <span className="font-mono font-bold">{projectName}</span> to confirm
+            </Label>
+            <Input
+              id="confirmDelete"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder={projectName}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => { setShowDeleteModal(false); setDeleteConfirmText(''); }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              disabled={deleteConfirmText !== projectName || deleting}
+              onClick={handleDeleteProject}
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete Project'
+              )}
+            </Button>
           </div>
         </div>
       </Modal>
