@@ -185,16 +185,18 @@ function SidebarComponent({ user, collapsed = false, organizationSlug, unreadAle
 
         {/* Settings & Sign out */}
         <div className={cn('mt-2 space-y-0.5', collapsed && 'flex flex-col items-center')}>
-          <Link
-            href={organizationSlug ? `/organizations/${organizationSlug}/settings` : '/organizations'}
-            className={cn(
-              'flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground',
-              collapsed && 'justify-center px-1.5'
-            )}
-          >
-            <Settings className="h-4 w-4" />
-            {!collapsed && <span>Settings</span>}
-          </Link>
+          {organizationSlug && (
+            <Link
+              href={`/organizations/${organizationSlug}/settings`}
+              className={cn(
+                'flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground',
+                collapsed && 'justify-center px-1.5'
+              )}
+            >
+              <Settings className="h-4 w-4" />
+              {!collapsed && <span>Settings</span>}
+            </Link>
+          )}
           <button
             onClick={() => signOut({ redirect: true, callbackUrl: '/login' })}
             className={cn(

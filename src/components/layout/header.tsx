@@ -258,21 +258,23 @@ function HeaderComponent({ user, sidebarCollapsed = false, organizationSlug, unr
                     <p className="text-xs text-muted-foreground">{user?.email}</p>
                   </div>
                   <Link
-                    href="/organizations/settings/profile"
+                    href={organizationSlug ? `/organizations/${organizationSlug}/settings/profile` : '#'}
                     onClick={() => setShowUserMenu(false)}
                     className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
                   >
                     <User className="h-4 w-4" />
                     Profile
                   </Link>
-                  <Link
-                    href="/organizations/settings"
-                    onClick={() => setShowUserMenu(false)}
-                    className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-                  >
-                    <Settings className="h-4 w-4" />
-                    Settings
-                  </Link>
+                  {organizationSlug && (
+                    <Link
+                      href={`/organizations/${organizationSlug}/settings`}
+                      onClick={() => setShowUserMenu(false)}
+                      className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
+                    >
+                      <Settings className="h-4 w-4" />
+                      Settings
+                    </Link>
+                  )}
                   <div className="border-t border-border mt-1.5 pt-1.5">
                     <button
                       onClick={handleSignOut}
