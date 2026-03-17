@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
-import { requireProjectAccess } from '@/lib/api-auth';
-import { success, error } from '@/lib/api-response';
-import { auditService } from '@/lib/services';
+import { requireProjectAccess } from '@/backend/middleware/auth';
+import { success, error } from '@/backend/utils/api-response';
+import { auditService, secretService } from '@/backend/services';
 
 /**
  * GET /api/secrets/[id]/audit-logs - Get audit logs for a secret
@@ -14,7 +14,6 @@ export async function GET(
     const { id: secretId } = await params;
 
     // Get the secret first to find projectId
-    const { secretService } = await import('@/lib/services');
     const secret = await secretService.getSecretById(secretId);
 
     if (!secret) {

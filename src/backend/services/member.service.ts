@@ -1,7 +1,7 @@
-import { db } from '../db';
+import { db } from '@/lib/db';
 import { auditService } from './audit.service';
 import { alertService } from './alert.service';
-import type { AddMemberInput } from '../schemas';
+import type { AddMemberInput } from '@/backend/schemas';
 
 /**
  * Member service - handles project member management

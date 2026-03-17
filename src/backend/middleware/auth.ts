@@ -1,7 +1,7 @@
-import { auth } from './auth';
-import { db } from './db';
+import { auth } from '@/lib/auth';
+import { db } from '@/lib/db';
 import { hasPermission, isProjectAdmin, hasProjectAccess, type Permission } from './permissions';
-import { unauthorized, forbidden, notFound } from './api-response';
+import { unauthorized, forbidden, notFound } from '@/backend/utils/api-response';
 
 /**
  * Current user type from session

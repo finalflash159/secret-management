@@ -1,6 +1,6 @@
-import { db } from '../db';
+import { db } from '@/lib/db';
 import { auditService } from './audit.service';
-import type { CreateFolderInput, UpdateFolderInput, ListFoldersQuery } from '../schemas';
+import type { CreateFolderInput, UpdateFolderInput, ListFoldersQuery } from '@/backend/schemas';
 
 /**
  * Folder service - handles folder CRUD

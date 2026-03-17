@@ -46,18 +46,39 @@ Organization (top-level container)
 
 - **Auth**: `src/lib/auth.ts` - NextAuth configuration
 - **Encryption**: `src/lib/encryption.ts` - AES-256-GCM encryption/decryption
-- **Permissions**: `src/lib/permissions.ts` - RBAC permission checks
-- **Services**: `src/lib/services/*.service.ts` - Business logic layer
+- **Database**: `src/lib/db.ts` - Prisma client
+- **Services**: `src/backend/services/*.service.ts` - Business logic layer
+- **Middleware**: `src/backend/middleware/auth.ts` - Auth & permissions
+- **Schemas**: `src/backend/schemas/*.schema.ts` - Zod validation
 - **Database**: `prisma/schema.prisma` - Database schema
 - **API Routes**: `src/app/api/**/route.ts` - API endpoints
+
+### Folder Structure
+
+```
+src/
+├── backend/               # Backend layer
+│   ├── services/         # Business logic
+│   ├── middleware/       # Auth & permissions
+│   ├── schemas/         # Zod validation
+│   └── utils/          # Utilities
+├── app/                  # Next.js App Router
+│   ├── api/            # API routes
+│   ├── (auth)/         # Auth pages
+│   └── (dashboard)/    # Protected pages
+├── components/           # React components
+│   ├── ui/             # Base UI
+│   └── layout/         # Layout components
+└── lib/                 # Shared utilities
+```
 
 ### API Patterns
 
 All API routes follow consistent patterns:
-- Use `requireAuth()` for authentication
-- Return `{ success, data, message }` responses
-- Use Zod schemas for validation in `src/lib/schemas/`
-- Service layer handles business logic
+- Use `requireAuth()` from `@backend/middleware/auth` for authentication
+- Return `{ success, data, message }` responses using helpers from `@backend/utils/api-response`
+- Use Zod schemas for validation in `@backend/schemas`
+- Service layer handles business logic in `@backend/services`
 
 ### Frontend Structure
 

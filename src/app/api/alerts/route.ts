@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { success, unauthorized, error } from '@/lib/api-response';
-import { alertService } from '@/lib/services';
+import { success, unauthorized, error } from '@/backend/utils/api-response';
+import { alertService } from '@/backend/services';
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       userId: session.user.id,
       orgId,
       projectId,
-      type: type as any,
+      type: type as import('@prisma/client').AlertType | undefined,
       read: read === 'true' ? true : read === 'false' ? false : undefined,
       limit,
       offset,

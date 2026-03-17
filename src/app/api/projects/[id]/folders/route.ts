@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
-import { requireProjectAccess } from '@/lib/api-auth';
-import { success, handleZodError, error } from '@/lib/api-response';
-import { createFolderSchema, listFoldersQuerySchema } from '@/lib/schemas';
-import { folderService } from '@/lib/services';
+import { requireProjectAccess } from '@/backend/middleware/auth';
+import { success, handleZodError, error } from '@/backend/utils/api-response';
+import { createFolderSchema, listFoldersQuerySchema } from '@/backend/schemas';
+import { folderService } from '@/backend/services';
 
 /**
  * GET /api/projects/[id]/folders - List folders

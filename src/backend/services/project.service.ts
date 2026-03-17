@@ -1,6 +1,6 @@
-import { db } from '../db';
-import { DEFAULT_PERMISSIONS } from '../permissions';
-import type { CreateProjectInput, UpdateProjectInput } from '../schemas';
+import { db } from '@/lib/db';
+import { DEFAULT_PERMISSIONS } from '@/backend/middleware/permissions';
+import type { CreateProjectInput, UpdateProjectInput } from '@/backend/schemas';
 
 /**
  * Project service - handles project CRUD and member management

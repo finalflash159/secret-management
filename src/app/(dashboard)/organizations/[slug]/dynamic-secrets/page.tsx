@@ -1,12 +1,9 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { Database, Key, Server, Cloud, Loader2 } from 'lucide-react';
+import { Database, Key, Server, Cloud } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 export default function DynamicSecretsPage() {
-  const params = useParams();
-  const slug = params.slug as string;
 
   const providers = [
     { id: 'postgresql', name: 'PostgreSQL', icon: Database, description: 'Database credentials' },

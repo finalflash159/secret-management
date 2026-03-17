@@ -1,12 +1,9 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { Key, Server, Lock, Loader2, Clock } from 'lucide-react';
+import { Key, Server, Lock, Clock } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 export default function SecretRotationPage() {
-  const params = useParams();
-  const slug = params.slug as string;
 
   return (
     <div className="space-y-4">

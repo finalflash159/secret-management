@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
-import { requireProjectAccess, requireProjectAdmin } from '@/lib/api-auth';
-import { success, handleZodError, error } from '@/lib/api-response';
-import { createEnvironmentSchema } from '@/lib/schemas';
-import { environmentService } from '@/lib/services';
+import { requireProjectAccess, requireProjectAdmin } from '@/backend/middleware/auth';
+import { success, handleZodError, error } from '@/backend/utils/api-response';
+import { createEnvironmentSchema } from '@/backend/schemas';
+import { environmentService } from '@/backend/services';
 
 /**
  * GET /api/projects/[id]/environments - List environments

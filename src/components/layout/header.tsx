@@ -32,7 +32,7 @@ interface HeaderProps {
   unreadAlerts?: number;
 }
 
-function HeaderComponent({ user, sidebarCollapsed = false, organizationSlug, unreadAlerts = 0 }: HeaderProps) {
+function HeaderComponent({ user, organizationSlug, unreadAlerts = 0 }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { addToast } = useToast();

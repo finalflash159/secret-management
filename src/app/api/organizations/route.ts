@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
-import { requireAuth } from '@/lib/api-auth';
-import { success, handleZodError, error } from '@/lib/api-response';
-import { createOrganizationSchema } from '@/lib/schemas';
-import { organizationService } from '@/lib/services';
+import { requireAuth } from '@/backend/middleware/auth';
+import { success, handleZodError, error } from '@/backend/utils/api-response';
+import { createOrganizationSchema } from '@/backend/schemas';
+import { organizationService } from '@/backend/services';
 
 /**
  * GET /api/organizations - List organizations

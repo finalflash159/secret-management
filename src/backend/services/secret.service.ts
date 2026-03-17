@@ -1,7 +1,7 @@
-import { db } from '../db';
-import { encrypt, decrypt, getMasterKey } from '../encryption';
+import { db } from '@/lib/db';
+import { encrypt, decrypt, getMasterKey } from '@/lib/encryption';
 import { auditService } from './audit.service';
-import type { CreateSecretInput, UpdateSecretInput, ListSecretsQuery } from '../schemas';
+import type { CreateSecretInput, UpdateSecretInput, ListSecretsQuery } from '@/backend/schemas';
 import type { Secret, Folder } from '@prisma/client';
 
 /**

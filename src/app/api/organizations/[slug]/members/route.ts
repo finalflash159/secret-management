@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
-import { requireOrgAccessBySlug, requireOrgOwner, handleAuthError } from '@/lib/api-auth';
-import { success, error } from '@/lib/api-response';
-import { alertService } from '@/lib/services';
+import { requireOrgAccessBySlug, handleAuthError } from '@/backend/middleware/auth';
+import { success, error } from '@/backend/utils/api-response';
+import { alertService } from '@/backend/services';
 import { z } from 'zod';
 
 const inviteMemberSchema = z.object({
@@ -31,7 +31,7 @@ export async function GET(
     }
 
     // Check access using org ID
-    const { id: userId, email: userEmail, name: userName, orgId } = await requireOrgAccessBySlug(slug);
+    await requireOrgAccessBySlug(slug);
 
     const organization = await db.organization.findUnique({
       where: { slug },
@@ -84,7 +84,7 @@ export async function POST(
     }
 
     // Check access using slug directly
-    const { id: currentUserId, email: currentUserEmail, name: currentUserName, orgId } = await requireOrgAccessBySlug(slug, 'admin');
+    const { id: currentUserId, orgId } = await requireOrgAccessBySlug(slug, 'admin');
 
     const body = await req.json();
     const { email, role } = inviteMemberSchema.parse(body);
@@ -174,7 +174,7 @@ export async function DELETE(
     }
 
     // Check access using slug directly
-    const { id: currentUserId, email: currentUserEmail, name: currentUserName, orgId } = await requireOrgAccessBySlug(slug, 'admin');
+    const { id: currentUserId, orgId } = await requireOrgAccessBySlug(slug, 'admin');
 
     // Find the member to be removed
     const member = await db.orgMember.findUnique({

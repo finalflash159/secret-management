@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
-import { requireProjectAccess } from '@/lib/api-auth';
-import { success, handleZodError, error } from '@/lib/api-response';
-import { createSecretSchema, listSecretsQuerySchema } from '@/lib/schemas';
-import { secretService, auditService } from '@/lib/services';
+import { requireProjectAccess } from '@/backend/middleware/auth';
+import { success, handleZodError, error } from '@/backend/utils/api-response';
+import { createSecretSchema, listSecretsQuerySchema } from '@/backend/schemas';
+import { secretService, auditService } from '@/backend/services';
 
 /**
  * GET /api/projects/[id]/secrets - List secrets in a project

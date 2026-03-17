@@ -1,5 +1,5 @@
-import { db } from '../db';
-import type { CreateOrganizationInput, UpdateOrganizationInput } from '../schemas';
+import { db } from '@/lib/db';
+import type { CreateOrganizationInput, UpdateOrganizationInput } from '@/backend/schemas';
 
 /**
  * Organization service - handles organization CRUD

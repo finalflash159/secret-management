@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
-import { requireProjectAccess, requireProjectAdmin } from '@/lib/api-auth';
-import { success, handleZodError, error, notFound } from '@/lib/api-response';
-import { addMemberSchema } from '@/lib/schemas';
-import { memberService } from '@/lib/services';
+import { requireProjectAccess, requireProjectAdmin } from '@/backend/middleware/auth';
+import { success, handleZodError, error, notFound } from '@/backend/utils/api-response';
+import { addMemberSchema } from '@/backend/schemas';
+import { memberService } from '@/backend/services';
 
 /**
  * GET /api/projects/[id]/members - List members

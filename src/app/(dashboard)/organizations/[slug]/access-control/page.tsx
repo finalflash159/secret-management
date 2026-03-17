@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Shield, Key, Plus, Folder, Loader2 } from 'lucide-react';
+import { Key, Folder, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
@@ -27,7 +27,6 @@ interface Project {
 
 export default function AccessControlPage() {
   const params = useParams();
-  const router = useRouter();
   const slug = params.slug as string;
 
   const [projects, setProjects] = useState<Project[]>([]);

@@ -34,7 +34,7 @@ function getInitialTheme(): Theme {
 
 export function ThemeProvider({ children, defaultTheme = 'dark' }: ThemeProviderProps) {
   const [theme, setThemeState] = useState<Theme>(defaultTheme);
-  const [mounted, setMounted] = useState(false);
+  const [, setMounted] = useState(false);
 
   useEffect(() => {
     const initialTheme = getInitialTheme();

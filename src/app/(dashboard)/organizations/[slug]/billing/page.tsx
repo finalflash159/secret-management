@@ -1,13 +1,10 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { CreditCard, Loader2, Building } from 'lucide-react';
+import { Building } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
 export default function BillingPage() {
-  const params = useParams();
-  const slug = params.slug as string;
 
   return (
     <div className="space-y-4">

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { success, unauthorized, error } from '@/lib/api-response';
-import { alertService } from '@/lib/services';
+import { success, unauthorized, error } from '@/backend/utils/api-response';
+import { alertService } from '@/backend/services';
 
 export async function GET(request: NextRequest) {
   try {

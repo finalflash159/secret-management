@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useEffect, useState, useRef, useMemo } from 'react';
+import { ReactNode, useEffect, useState, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSession } from '@/components/session-provider';
 import { Sidebar } from '@/components/layout/sidebar';
@@ -15,8 +15,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
   const { user, loading } = useSession();
   const [unreadAlerts, setUnreadAlerts] = useState(0);
-  const [isNavigating, setIsNavigating] = useState(false);
-  const prevPathRef = useRef(pathname);
 
   // Extract org slug from pathname - use useMemo to ensure consistency
   const currentOrgSlug = useMemo(() => {
@@ -50,18 +48,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       return segments[1];
     }
     return null;
-  }, [pathname]);
-
-  // Detect navigation to show skeleton
-  useEffect(() => {
-    if (prevPathRef.current !== pathname) {
-      setIsNavigating(true);
-      const timer = setTimeout(() => {
-        setIsNavigating(false);
-        prevPathRef.current = pathname;
-      }, 50);
-      return () => clearTimeout(timer);
-    }
   }, [pathname]);
 
   // Fetch unread alert count only once on initial load

@@ -1,4 +1,4 @@
-import { db } from '../db';
+import { db } from '@/lib/db';
 
 export type AuditAction = 'created' | 'updated' | 'deleted' | 'viewed' | 'exported';
 export type AuditTargetType = 'secret' | 'folder' | 'project' | 'member' | 'environment' | 'role' | 'organization';

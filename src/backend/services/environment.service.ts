@@ -1,6 +1,6 @@
-import { db } from '../db';
+import { db } from '@/lib/db';
 import { auditService } from './audit.service';
-import type { CreateEnvironmentInput } from '../schemas';
+import type { CreateEnvironmentInput } from '@/backend/schemas';
 
 /**
  * Environment service - handles environment CRUD

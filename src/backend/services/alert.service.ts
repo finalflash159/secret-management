@@ -1,4 +1,4 @@
-import { db } from '../db';
+import { db } from '@/lib/db';
 import { AlertType } from '@prisma/client';
 
 export type AlertTypeEnum = AlertType;

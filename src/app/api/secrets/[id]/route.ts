@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
-import { requireProjectAccess, requireAuth } from '@/lib/api-auth';
-import { success, handleZodError, error, notFound } from '@/lib/api-response';
-import { updateSecretSchema } from '@/lib/schemas';
-import { secretService, auditService } from '@/lib/services';
+import { requireProjectAccess } from '@/backend/middleware/auth';
+import { success, handleZodError, error, notFound } from '@/backend/utils/api-response';
+import { updateSecretSchema } from '@/backend/schemas';
+import { secretService, auditService } from '@/backend/services';
 
 /**
  * GET /api/secrets/[id] - Get a single secret

@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
-import { requireProjectAccess } from '@/lib/api-auth';
-import { success, handleZodError, error, notFound } from '@/lib/api-response';
-import { updateProjectSchema } from '@/lib/schemas';
-import { projectService } from '@/lib/services';
+import { requireProjectAccess } from '@/backend/middleware/auth';
+import { success, handleZodError, error, notFound } from '@/backend/utils/api-response';
+import { updateProjectSchema } from '@/backend/schemas';
+import { projectService } from '@/backend/services';
 
 /**
  * GET /api/projects/[id] - Get a project

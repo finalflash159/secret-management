@@ -1,8 +1,7 @@
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
-import { requireOrgAccessBySlug, requireOrgOwner, handleAuthError } from '@/lib/api-auth';
-import { success, error } from '@/lib/api-response';
-import { alertService } from '@/lib/services';
+import { requireOrgAccessBySlug, handleAuthError } from '@/backend/middleware/auth';
+import { success, error } from '@/backend/utils/api-response';
 import { z } from 'zod';
 
 const updateMemberSchema = z.object({
@@ -18,7 +17,7 @@ export async function PATCH(
 ) {
   try {
     const { slug, memberId } = await params;
-    const { id: currentUserId, email: currentUserEmail, name: currentUserName, orgId, isOwner } = await requireOrgAccessBySlug(slug, 'admin');
+    const { id: currentUserId, isOwner } = await requireOrgAccessBySlug(slug, 'admin');
 
     // Get organization to find member
     const organization = await db.organization.findUnique({
@@ -87,7 +86,7 @@ export async function DELETE(
 ) {
   try {
     const { slug, memberId } = await params;
-    const { id: currentUserId, email: currentUserEmail, name: currentUserName, orgId, isOwner } = await requireOrgAccessBySlug(slug, 'admin');
+    const { id: currentUserId, isOwner } = await requireOrgAccessBySlug(slug, 'admin');
 
     // Get organization to find member
     const organization = await db.organization.findUnique({

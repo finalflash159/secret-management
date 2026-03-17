@@ -1,12 +1,9 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { Github, Cloud, MessageSquare, Loader2 } from 'lucide-react';
+import { Github, Cloud, MessageSquare } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 
 export default function IntegrationsPage() {
-  const params = useParams();
-  const slug = params.slug as string;
 
   const integrations = [
     { id: 'github', name: 'GitHub', icon: Github, description: 'CI/CD and secrets sync' },
