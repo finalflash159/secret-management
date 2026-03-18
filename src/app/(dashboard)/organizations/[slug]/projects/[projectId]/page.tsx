@@ -109,6 +109,7 @@ export default function ProjectSecretsPage() {
     if (selectedSecret) {
       fetchAuditLogs(selectedSecret.id);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSecret?.id]);
 
   const fetchAuditLogs = async (secretId: string) => {
@@ -127,12 +128,14 @@ export default function ProjectSecretsPage() {
     if (projectId) {
       fetchProjectData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
   useEffect(() => {
     if (activeEnv) {
       fetchSecrets();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEnv]);
 
   // Handle imported secrets from header
@@ -158,6 +161,7 @@ export default function ProjectSecretsPage() {
       }
     };
     importSecrets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEnv, projectId]);
 
   // Set up secrets for export
@@ -207,10 +211,13 @@ export default function ProjectSecretsPage() {
 
   const fetchSecrets = async () => {
     try {
-      const res = await fetch(`/api/projects/${projectId}/secrets?envId=${activeEnv}`);
+      // Add decrypt=true to get decrypted values for the secrets list
+      const res = await fetch(`/api/projects/${projectId}/secrets?envId=${activeEnv}&decrypt=true`);
       if (res.ok) {
         const json = await res.json();
-        setSecrets(json?.data ?? json);
+        // Handle paginated response format
+        const data = json?.data?.data ?? json?.data ?? json;
+        setSecrets(data || []);
       }
     } catch (err) {
       console.error('Failed to fetch secrets:', err);
@@ -459,6 +466,32 @@ export default function ProjectSecretsPage() {
       }
     } catch {
       setError('Failed to remove member');
+    }
+  };
+
+  const handleUpdateMemberRole = async (memberId: string, newRoleSlug: string) => {
+    try {
+      // Get roles first
+      const rolesRes = await fetch(`/api/projects/${projectId}/roles`);
+      const rolesJson = await rolesRes.json();
+      const roles = rolesJson.data || rolesJson;
+      const selectedRole = roles.find((r: {slug: string}) => r.slug === newRoleSlug);
+
+      if (!selectedRole) {
+        setError('Role not found');
+        return;
+      }
+
+      const res = await fetch(`/api/projects/${projectId}/members/${memberId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roleId: selectedRole.id }),
+      });
+      if (res.ok) {
+        fetchTeamMembers();
+      }
+    } catch {
+      setError('Failed to update member role');
     }
   };
 
@@ -747,15 +780,15 @@ export default function ProjectSecretsPage() {
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); openEditModal(secret); }}
-                      className="p-1.5 rounded hover:bg-muted"
+                      className="p-1.5 rounded hover:bg-muted/80"
                     >
-                      <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                      <Pencil className="h-4 w-4 text-foreground" />
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDeleteSecret(secret.id); }}
-                      className="p-1.5 rounded hover:bg-danger/10"
+                      className="p-1.5 rounded hover:bg-danger/20"
                     >
-                      <Trash2 className="h-3.5 w-3.5 text-danger" />
+                      <Trash2 className="h-4 w-4 text-danger" />
                     </button>
                   </div>
                 </div>
@@ -1087,13 +1120,21 @@ export default function ProjectSecretsPage() {
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {teamMembers.map((member) => (
               <div key={member.id} className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-muted">
-                <div>
+                <div className="flex-1">
                   <p className="text-sm text-foreground">{member.user.name || member.user.email}</p>
-                  <p className="text-xs text-muted-foreground">{member.role.name}</p>
+                  <select
+                    value={member.role.slug}
+                    onChange={(e) => handleUpdateMemberRole(member.id, e.target.value)}
+                    className="text-xs mt-1 rounded border border-border bg-background px-2 py-1"
+                  >
+                    <option value="admin">Admin</option>
+                    <option value="editor">Editor</option>
+                    <option value="viewer">Viewer</option>
+                  </select>
                 </div>
                 <button
                   onClick={() => handleRemoveMember(member.id)}
-                  className="text-xs text-danger hover:text-danger/80"
+                  className="text-xs text-danger hover:text-danger/80 ml-2"
                 >
                   Remove
                 </button>

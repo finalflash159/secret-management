@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { hashPassword } from '@/lib/encryption';
+import { invitationService } from '@/backend/services';
 import { z } from 'zod';
 
 const registerSchema = z.object({
@@ -28,16 +29,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify invite code if provided
+    // Validate invite code if provided (from database)
+    let invitationData: {
+      valid: boolean;
+      error?: string;
+      role?: string;
+      invitationId?: string;
+      orgId?: string;
+    } = { valid: true };
+
     if (validatedData.inviteCode) {
-      // For now, we'll check against environment variable
-      // In production, this would check against stored invite codes
-      const validCodes = (process.env.INVITE_CODES || '').split(',').filter(Boolean);
-      if (!validCodes.includes(validatedData.inviteCode)) {
-        return NextResponse.json(
-          { error: 'Invalid invitation code' },
-          { status: 400 }
-        );
+      // First check database for invite code
+      const dbValidation = await invitationService.validateForRegistration(
+        validatedData.inviteCode,
+        validatedData.email
+      );
+
+      if (!dbValidation.valid) {
+        // Fall back to env var check for backward compatibility
+        const validCodes = (process.env.INVITE_CODES || '').split(',').filter(Boolean);
+        if (!validCodes.includes(validatedData.inviteCode)) {
+          return NextResponse.json(
+            { error: dbValidation.error || 'Invalid invitation code' },
+            { status: 400 }
+          );
+        }
+      } else {
+        invitationData = dbValidation;
       }
     }
 
@@ -66,6 +84,22 @@ export async function POST(req: NextRequest) {
         name: validatedData.name,
       },
     });
+
+    // If registered via invitation, add to organization
+    if (invitationData.valid && invitationData.invitationId && invitationData.role && invitationData.orgId) {
+      // Mark invitation as used
+      await invitationService.markAsUsed(invitationData.invitationId, user.id);
+
+      // Add user to organization with the role from invitation
+      await db.orgMember.create({
+        data: {
+          userId: user.id,
+          orgId: invitationData.orgId,
+          role: invitationData.role as 'admin' | 'member',
+          invitationId: invitationData.invitationId,
+        },
+      });
+    }
 
     return NextResponse.json(
       {

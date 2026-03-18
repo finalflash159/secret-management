@@ -58,6 +58,7 @@ export const organizationService = {
         projects: {
           include: {
             environments: true,
+            roles: true,
             _count: {
               select: {
                 secrets: true,

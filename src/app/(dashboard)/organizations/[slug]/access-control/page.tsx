@@ -2,16 +2,19 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { Key, Folder, Loader2 } from 'lucide-react';
+import { Key, Folder, Plus, Pencil, Trash2, Loader2, Shield } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Modal } from '@/components/ui/modal';
+import { useToast } from '@/components/ui/toast';
 
 interface Role {
   id: string;
   name: string;
   slug: string;
-  permissions: string[];
+  permissions: string[] | unknown[];
   isDefault: boolean;
   _count: {
     members: number;
@@ -25,12 +28,40 @@ interface Project {
   roles: Role[];
 }
 
+const allPermissions = [
+  { name: 'secret:read', description: 'Read secrets' },
+  { name: 'secret:write', description: 'Create and update secrets' },
+  { name: 'secret:delete', description: 'Delete secrets' },
+  { name: 'folder:manage', description: 'Create and manage folders' },
+  { name: 'member:manage', description: 'Manage project members' },
+  { name: 'settings:manage', description: 'Manage project settings' },
+  { name: 'project:delete', description: 'Delete the project' },
+];
+
+const systemRoles = ['admin', 'editor', 'viewer'];
+
 export default function AccessControlPage() {
   const params = useParams();
   const slug = params.slug as string;
+  const { addToast } = useToast();
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedProject, setSelectedProject] = useState<string>('');
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(false);
+
+  // Modal states
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // Form state
+  const [roleName, setRoleName] = useState('');
+  const [roleSlug, setRoleSlug] = useState('');
+  const [rolePermissions, setRolePermissions] = useState<string[]>([]);
+  const [roleIsDefault, setRoleIsDefault] = useState(false);
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -39,6 +70,9 @@ export default function AccessControlPage() {
         const json = await res.json();
         const data = json?.data ?? json;
         setProjects(data.projects || []);
+        if (data.projects?.length > 0) {
+          setSelectedProject(data.projects[0].id);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch projects:', err);
@@ -47,19 +81,161 @@ export default function AccessControlPage() {
     }
   }, [slug]);
 
+  const fetchRoles = useCallback(async () => {
+    if (!selectedProject) {
+      setRoles([]);
+      return;
+    }
+
+    setRolesLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${selectedProject}/roles`);
+      if (res.ok) {
+        const json = await res.json();
+        const data = json?.data ?? json;
+        setRoles(data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch roles:', err);
+    } finally {
+      setRolesLoading(false);
+    }
+  }, [selectedProject]);
+
   useEffect(() => {
     fetchProjects();
   }, [fetchProjects]);
 
-  const allPermissions = [
-    { name: 'secret:read', description: 'Read secrets' },
-    { name: 'secret:write', description: 'Create and update secrets' },
-    { name: 'secret:delete', description: 'Delete secrets' },
-    { name: 'folder:manage', description: 'Create and manage folders' },
-    { name: 'member:manage', description: 'Manage project members' },
-    { name: 'settings:manage', description: 'Manage project settings' },
-    { name: 'project:delete', description: 'Delete the project' },
-  ];
+  useEffect(() => {
+    fetchRoles();
+  }, [fetchRoles]);
+
+  const generateSlug = (name: string) => {
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .trim();
+  };
+
+  const handleNameChange = (name: string) => {
+    setRoleName(name);
+    if (!editingRole) {
+      setRoleSlug(generateSlug(name));
+    }
+  };
+
+  const togglePermission = (perm: string) => {
+    setRolePermissions(prev =>
+      prev.includes(perm)
+        ? prev.filter(p => p !== perm)
+        : [...prev, perm]
+    );
+  };
+
+  const resetForm = () => {
+    setRoleName('');
+    setRoleSlug('');
+    setRolePermissions([]);
+    setRoleIsDefault(false);
+  };
+
+  const openEditModal = (role: Role) => {
+    setEditingRole(role);
+    setRoleName(role.name);
+    setRoleSlug(role.slug);
+    setRolePermissions((role.permissions as string[]) || []);
+    setRoleIsDefault(role.isDefault);
+    setShowEditModal(true);
+  };
+
+  const handleCreateRole = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProject) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/projects/${selectedProject}/roles`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: roleName,
+          slug: roleSlug,
+          permissions: rolePermissions,
+          isDefault: roleIsDefault,
+        }),
+      });
+
+      if (res.ok) {
+        addToast({ title: 'Role created', variant: 'success' });
+        setShowCreateModal(false);
+        resetForm();
+        fetchRoles();
+      } else {
+        const data = await res.json();
+        addToast({ title: data.error || 'Failed to create role', variant: 'error' });
+      }
+    } catch {
+      addToast({ title: 'An error occurred', variant: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUpdateRole = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRole || !selectedProject) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/projects/${selectedProject}/roles/${editingRole.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: roleName,
+          permissions: rolePermissions,
+          isDefault: roleIsDefault,
+        }),
+      });
+
+      if (res.ok) {
+        addToast({ title: 'Role updated', variant: 'success' });
+        setShowEditModal(false);
+        setEditingRole(null);
+        resetForm();
+        fetchRoles();
+      } else {
+        const data = await res.json();
+        addToast({ title: data.error || 'Failed to update role', variant: 'error' });
+      }
+    } catch {
+      addToast({ title: 'An error occurred', variant: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteRole = async (role: Role) => {
+    if (!confirm(`Are you sure you want to delete "${role.name}"?`)) return;
+    if (!selectedProject) return;
+
+    try {
+      const res = await fetch(`/api/projects/${selectedProject}/roles/${role.id}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        addToast({ title: 'Role deleted', variant: 'success' });
+        fetchRoles();
+      } else {
+        const data = await res.json();
+        addToast({ title: data.error || 'Failed to delete role', variant: 'error' });
+      }
+    } catch {
+      addToast({ title: 'An error occurred', variant: 'error' });
+    }
+  };
 
   if (loading) {
     return (
@@ -71,10 +247,36 @@ export default function AccessControlPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-foreground">Access Control</h1>
-        <p className="text-sm text-muted-foreground">Manage roles and permissions for your projects</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-foreground">Access Control</h1>
+          <p className="text-sm text-muted-foreground">Manage roles and permissions for your projects</p>
+        </div>
+        <Button onClick={() => setShowCreateModal(true)} disabled={!selectedProject}>
+          <Plus className="h-4 w-4 mr-2" />
+          New Role
+        </Button>
       </div>
+
+      {/* Project Selector */}
+      {projects.length > 0 && (
+        <div className="flex gap-4">
+          <div className="flex-1 max-w-xs">
+            <Label htmlFor="project">Project</Label>
+            <select
+              id="project"
+              value={selectedProject}
+              onChange={(e) => setSelectedProject(e.target.value)}
+              className="flex h-9 w-full rounded-md border border-border bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+            >
+              <option value="">Select project</option>
+              {projects.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
 
       {/* Permissions Reference */}
       <Card className="bg-card border-border">
@@ -100,59 +302,224 @@ export default function AccessControlPage() {
       </Card>
 
       {/* Project Roles */}
-      <div>
-        <h2 className="text-sm font-semibold text-foreground mb-3">Project Roles</h2>
-        {projects.length === 0 ? (
-          <Card className="bg-card border-border">
-            <CardContent className="p-8 text-center">
-              <Folder className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
-              <p className="text-sm text-muted-foreground">No projects yet</p>
-              <p className="text-xs text-muted-foreground">Create a project to manage roles</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {projects.map((project) => (
-              <Card key={project.id} className="bg-card border-border">
+      {!selectedProject ? (
+        <Card className="bg-card border-border">
+          <CardContent className="p-8 text-center">
+            <Shield className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+            <p className="text-sm text-muted-foreground">Select a project to manage roles</p>
+          </CardContent>
+        </Card>
+      ) : rolesLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : roles.length === 0 ? (
+        <Card className="bg-card border-border">
+          <CardContent className="p-8 text-center">
+            <Folder className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+            <p className="text-sm text-muted-foreground">No custom roles yet</p>
+            <p className="text-xs text-muted-foreground">Create a role to manage access</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {roles.map((role) => {
+            const isSystem = systemRoles.includes(role.slug);
+            return (
+              <Card key={role.id} className="bg-card border-border">
                 <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <Folder className="h-4 w-4 text-muted-foreground" />
-                      <h3 className="font-medium text-foreground">{project.name}</h3>
-                    </div>
-                    <Link href={`/organizations/${slug}/projects/${project.id}`}>
-                      <Button variant="ghost" size="sm">
-                        View
-                      </Button>
-                    </Link>
-                  </div>
-                  {project.roles && project.roles.length > 0 ? (
-                    <div className="space-y-2">
-                      {project.roles.map((role) => (
-                        <div key={role.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/50">
-                          <div>
-                            <span className="text-sm text-foreground">{role.name}</span>
-                            {role.isDefault && (
-                              <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
-                                Default
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-xs text-muted-foreground">
-                            {role._count?.members || 0} members
-                          </span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-muted">
+                        <Shield className="h-4 w-4 text-foreground" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-foreground">{role.name}</span>
+                          {isSystem && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                              System
+                            </span>
+                          )}
+                          {role.isDefault && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                              Default
+                            </span>
+                          )}
                         </div>
+                        <p className="text-xs text-muted-foreground">
+                          {role._count?.members || 0} members
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground font-mono mr-2">
+                        {role.slug}
+                      </span>
+                      {!isSystem && (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                            onClick={() => openEditModal(role)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-danger"
+                            onClick={() => handleDeleteRole(role)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {Array.isArray(role.permissions) && role.permissions.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1">
+                      {(role.permissions as string[]).map((perm) => (
+                        <span
+                          key={perm}
+                          className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono"
+                        >
+                          {perm}
+                        </span>
                       ))}
                     </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">No custom roles</p>
                   )}
                 </CardContent>
               </Card>
-            ))}
+            );
+          })}
+        </div>
+      )}
+
+      {/* Create Role Modal */}
+      <Modal isOpen={showCreateModal} onClose={() => { setShowCreateModal(false); resetForm(); }} title="Create Role">
+        <form onSubmit={handleCreateRole} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="name">Role Name</Label>
+            <Input
+              id="name"
+              value={roleName}
+              onChange={(e) => handleNameChange(e.target.value)}
+              placeholder="e.g., QA Engineer"
+              required
+            />
           </div>
-        )}
-      </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="slug">Slug</Label>
+            <Input
+              id="slug"
+              value={roleSlug}
+              onChange={(e) => setRoleSlug(e.target.value)}
+              placeholder="qa-engineer"
+              required
+            />
+            <p className="text-[10px] text-muted-foreground">URL-friendly identifier (lowercase, no spaces)</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Permissions</Label>
+            <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+              {allPermissions.map((perm) => (
+                <label
+                  key={perm.name}
+                  className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted p-1.5 rounded"
+                >
+                  <input
+                    type="checkbox"
+                    checked={rolePermissions.includes(perm.name)}
+                    onChange={() => togglePermission(perm.name)}
+                    className="rounded border-border"
+                  />
+                  <span className="font-mono text-foreground">{perm.name}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={roleIsDefault}
+              onChange={(e) => setRoleIsDefault(e.target.checked)}
+              className="rounded border-border"
+            />
+            <span className="text-foreground">Set as default role</span>
+          </label>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => { setShowCreateModal(false); resetForm(); }}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saving} size="sm">
+              {saving ? 'Creating...' : 'Create'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Role Modal */}
+      <Modal isOpen={showEditModal} onClose={() => { setShowEditModal(false); setEditingRole(null); resetForm(); }} title="Edit Role">
+        <form onSubmit={handleUpdateRole} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="editName">Role Name</Label>
+            <Input
+              id="editName"
+              value={roleName}
+              onChange={(e) => setRoleName(e.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="editSlug">Slug</Label>
+            <Input
+              id="editSlug"
+              value={roleSlug}
+              disabled
+              className="bg-muted"
+            />
+            <p className="text-[10px] text-muted-foreground">Slug cannot be changed</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Permissions</Label>
+            <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+              {allPermissions.map((perm) => (
+                <label
+                  key={perm.name}
+                  className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted p-1.5 rounded"
+                >
+                  <input
+                    type="checkbox"
+                    checked={rolePermissions.includes(perm.name)}
+                    onChange={() => togglePermission(perm.name)}
+                    className="rounded border-border"
+                  />
+                  <span className="font-mono text-foreground">{perm.name}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={roleIsDefault}
+              onChange={(e) => setRoleIsDefault(e.target.checked)}
+              className="rounded border-border"
+            />
+            <span className="text-foreground">Set as default role</span>
+          </label>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => { setShowEditModal(false); setEditingRole(null); resetForm(); }}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saving} size="sm">
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

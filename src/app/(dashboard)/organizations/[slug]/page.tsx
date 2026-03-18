@@ -42,6 +42,7 @@ export default function OrganizationProjectsPage() {
 
   useEffect(() => {
     fetchOrganization();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
   const fetchOrganization = async () => {

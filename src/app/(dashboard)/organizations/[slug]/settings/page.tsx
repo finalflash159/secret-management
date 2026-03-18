@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Settings, Users, CreditCard, Building, Loader2, Save, Trash2, AlertTriangle } from 'lucide-react';
+import { Settings, Users, CreditCard, Building, Loader2, Save, Trash2, AlertTriangle, Mail } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -95,6 +95,7 @@ export default function SettingsPage() {
   const sections = [
     { icon: Settings, name: 'General Settings', description: 'Organization name and details', href: null, action: null },
     { icon: Users, name: 'Members', description: 'Team members and roles', href: `/organizations/${slug}/members`, action: null },
+    { icon: Mail, name: 'Invitations', description: 'Manage invitation codes', href: `/organizations/${slug}/invitations`, action: null },
     { icon: CreditCard, name: 'Billing', description: 'Plans and payment methods', href: `/organizations/${slug}/billing`, action: null },
   ];
 
@@ -171,7 +172,7 @@ export default function SettingsPage() {
       <div>
         <h2 className="text-sm font-semibold text-foreground mb-3">Quick Links</h2>
         <div className="grid gap-4 md:grid-cols-2">
-          {sections.slice(1).map((section) => (
+          {sections.map((section) => (
             <Link key={section.name} href={section.href || '#'}>
               <Card className="bg-card border-border hover:border-border-hover cursor-pointer transition-colors">
                 <CardContent className="p-4">

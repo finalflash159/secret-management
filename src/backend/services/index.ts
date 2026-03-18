@@ -8,3 +8,7 @@ export { folderService } from './folder.service';
 export { environmentService } from './environment.service';
 export { memberService } from './member.service';
 export { alertService } from './alert.service';
+export { invitationService } from './invitation.service';
+export { dynamicSecretService } from './dynamic-secret.service';
+export { integrationService } from './integration.service';
+export { rotationService } from './rotation.service';
