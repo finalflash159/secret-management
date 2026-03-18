@@ -32,6 +32,7 @@ export default function GlobalAlertsPage() {
 
   useEffect(() => {
     fetchAlerts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
   const fetchAlerts = async () => {

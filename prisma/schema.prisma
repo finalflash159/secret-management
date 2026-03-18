@@ -25,6 +25,9 @@ model User {
   alerts        Alert[]
   createdSecrets Secret[] @relation("SecretCreatedBy")
   updatedSecrets Secret[] @relation("SecretUpdatedBy")
+  invitationUses InvitationUse[]
+  createdDynamicSecrets DynamicSecret[] @relation("DynamicSecretCreatedBy")
+  updatedDynamicSecrets DynamicSecret[] @relation("DynamicSecretUpdatedBy")
 }
 
 // Organization - Team organization
@@ -38,6 +41,8 @@ model Organization {
   projects    Project[]
   members     OrgMember[]
   alerts      Alert[]
+  invitations OrgInvitation[]
+  integrations Integration[]
 }
 
 // Project - Project containing secrets
@@ -52,8 +57,9 @@ model Project {
   environments   ProjectEnvironment[]
   folders        Folder[]
   secrets        Secret[]
-  members        ProjectMember[]
+  dynamicSecrets DynamicSecret[]
   roles          Role[]
+  members        ProjectMember[]
   alerts         Alert[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -70,6 +76,7 @@ model ProjectEnvironment {
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   secrets   Secret[]
   folders   Folder[]
+  dynamicSecrets DynamicSecret[]
   createdAt DateTime @default(now())
 
   @@unique([projectId, slug])
@@ -87,6 +94,7 @@ model Folder {
   parent       Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id])
   children     Folder[] @relation("FolderHierarchy")
   secrets      Secret[]
+  dynamicSecrets DynamicSecret[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -128,6 +136,81 @@ model SecretVersion {
   createdBy String
   user      User     @relation(fields: [createdBy], references: [id])
   createdAt DateTime @default(now())
+}
+
+// DynamicSecret - Dynamically generated credentials
+model DynamicSecret {
+  id          String    @id @default(cuid())
+  name        String    // Display name for the dynamic secret
+  provider    String    // postgresql, mysql, mongodb, redis
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  envId       String
+  environment ProjectEnvironment @relation(fields: [envId], references: [id], onDelete: Cascade)
+  folderId    String?
+  folder      Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  rotationPeriod Int    @default(86400) // Rotation period in seconds (default: 24h)
+  lastRotatedAt DateTime?
+  nextRotationAt DateTime?
+  config      Json      // Provider-specific configuration (host, port, database, etc.)
+  createdBy   String
+  createdByUser User    @relation("DynamicSecretCreatedBy", fields: [createdBy], references: [id])
+  updatedBy   String?
+  updatedByUser User?   @relation("DynamicSecretUpdatedBy", fields: [updatedBy], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  credentials DynamicSecretCredential[]
+  rotationJobs RotationJob[]
+  rotationLogs RotationLog[]
+
+  @@unique([projectId, envId, name])
+}
+
+// DynamicSecretCredential - Generated credentials (retrieved on demand)
+model DynamicSecretCredential {
+  id              String    @id @default(cuid())
+  dynamicSecretId String
+  dynamicSecret   DynamicSecret @relation(fields: [dynamicSecretId], references: [id], onDelete: Cascade)
+  username        String    // Generated username
+  password        String    // Generated password (encrypted)
+  expiresAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([dynamicSecretId])
+}
+
+// RotationJob - Scheduled rotation jobs
+model RotationJob {
+  id              String   @id @default(cuid())
+  name            String
+  dynamicSecretId String
+  dynamicSecret   DynamicSecret @relation(fields: [dynamicSecretId], references: [id], onDelete: Cascade)
+  cronExpression  String   // Cron expression: "0 0 * * *" = daily
+  isActive        Boolean  @default(true)
+  lastRunAt       DateTime?
+  nextRunAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  rotationLogs    RotationLog[]
+
+  @@unique([dynamicSecretId])
+}
+
+// RotationLog - Rotation history
+model RotationLog {
+  id              String   @id @default(cuid())
+  rotationJobId    String?
+  rotationJob     RotationJob? @relation(fields: [rotationJobId], references: [id], onDelete: SetNull)
+  dynamicSecretId String
+  dynamicSecret   DynamicSecret @relation(fields: [dynamicSecretId], references: [id], onDelete: Cascade)
+  status          String   // success, failed
+  oldCredentialId String?
+  newCredentialId String?
+  errorMessage    String?
+  rotatedBy       String   // system, manual
+  createdAt       DateTime @default(now())
+
+  @@index([dynamicSecretId, createdAt])
 }
 
 // AuditLog - Activity logs
@@ -177,15 +260,59 @@ model Role {
 
 // OrgMember - Organization member
 model OrgMember {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  orgId     String
-  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  role      String   // owner, admin, member
-  createdAt DateTime @default(now())
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id])
+  orgId          String
+  org            Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  role           RoleType      // owner, admin, member
+  invitedBy      String?       // userId who invited
+  invitationId   String?       // OrgInvitation ID if joined via invite code
+  createdAt      DateTime      @default(now())
 
   @@unique([userId, orgId])
+}
+
+// Role types for organization and project
+enum RoleType {
+  owner
+  admin
+  member
+}
+
+// Invitation codes for organization membership
+model OrgInvitation {
+  id           String          @id @default(cuid())
+  orgId        String
+  org          Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  code         String          @unique // 8-char alphanumeric
+  email        String?         @unique // Optional: restrict to specific email
+  role         RoleType        // admin, member
+  maxUses      Int?            // null = unlimited
+  usedCount    Int             @default(0)
+  expiresAt    DateTime?       // null = never expires
+  createdBy    String          // userId of admin who created
+  revokedAt    DateTime?
+  isRevoked    Boolean         @default(false)
+  createdAt    DateTime        @default(now())
+
+  // Relations
+  uses         InvitationUse[]
+
+  @@index([orgId, createdAt])
+  @@index([code])
+}
+
+// Track who used each invitation
+model InvitationUse {
+  id            String        @id @default(cuid())
+  invitationId  String
+  invitation    OrgInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  usedAt        DateTime      @default(now())
+
+  @@unique([invitationId, userId])
 }
 
 // Alert - User notifications and alerts
@@ -215,6 +342,35 @@ model Alert {
 
   @@index([userId, read, createdAt])
   @@index([orgId, createdAt])
+}
+
+// Integration - Connected external services
+model Integration {
+  id          String   @id @default(cuid())
+  orgId       String
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  type        String   // github, aws, gcp, azure, slack
+  name        String   // Display name
+  config      Json     // API keys, tokens, etc. (encrypted)
+  isActive    Boolean  @default(true)
+  lastSyncAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  syncs       IntegrationSync[]
+
+  @@unique([orgId, type])
+}
+
+// IntegrationSync - Sync history
+model IntegrationSync {
+  id              String   @id @default(cuid())
+  integrationId   String
+  integration     Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  direction       String   // push, pull
+  status          String   // success, failed, pending
+  secretsCount    Int      @default(0)
+  errorMessage    String?
+  createdAt       DateTime @default(now())
 }
 
 enum AlertType {

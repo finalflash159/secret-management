@@ -1,7 +1,7 @@
 import { db } from '@/lib/db';
 
-export type AuditAction = 'created' | 'updated' | 'deleted' | 'viewed' | 'exported';
-export type AuditTargetType = 'secret' | 'folder' | 'project' | 'member' | 'environment' | 'role' | 'organization';
+export type AuditAction = 'created' | 'updated' | 'deleted' | 'viewed' | 'exported' | 'rotated';
+export type AuditTargetType = 'secret' | 'folder' | 'project' | 'member' | 'environment' | 'role' | 'organization' | 'dynamic_secret' | 'integration';
 
 /**
  * Audit service - centralized audit logging
@@ -70,6 +70,27 @@ export const auditService = {
    */
   async logFolderDeleted(folderId: string, name: string, userId: string, projectId: string) {
     return this.log('deleted', 'folder', folderId, userId, projectId, { name });
+  },
+
+  /**
+   * Log dynamic secret created
+   */
+  async logDynamicSecretCreated(secretId: string, name: string, userId: string, projectId: string) {
+    return this.log('created', 'dynamic_secret', secretId, userId, projectId, { name });
+  },
+
+  /**
+   * Log dynamic secret deleted
+   */
+  async logDynamicSecretDeleted(secretId: string, name: string, userId: string, projectId: string) {
+    return this.log('deleted', 'dynamic_secret', secretId, userId, projectId, { name });
+  },
+
+  /**
+   * Log dynamic secret rotated
+   */
+  async logDynamicSecretRotated(secretId: string, name: string, userId: string, projectId: string) {
+    return this.log('rotated', 'dynamic_secret', secretId, userId, projectId, { name });
   },
 
   /**

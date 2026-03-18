@@ -22,6 +22,26 @@ interface ProjectInfo {
 }
 
 /**
+ * Secret list item (without decrypted value - for list view)
+ */
+export interface SecretListItem {
+  id: string;
+  key: string;
+  envId: string;
+  folderId: string;
+  projectId: string;
+  version: number;
+  expiresAt: Date | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string;
+  updatedBy: string | null;
+  environment: EnvironmentInfo;
+  folder: Folder;
+}
+
+/**
  * Secret with decrypted value
  */
 export interface SecretWithDecryptedValue extends Secret {
@@ -34,21 +54,41 @@ export interface SecretWithDecryptedValue extends Secret {
 }
 
 /**
+ * Paginated secrets response
+ */
+export interface PaginatedSecrets {
+  data: (SecretListItem | SecretWithDecryptedValue)[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+/**
  * Secret service - handles all secret operations including encryption
  */
 export const secretService = {
   /**
-   * Get all secrets for a project
+   * Get secrets for a project with pagination
+   * By default, does NOT decrypt values for performance (list view)
+   * Set decrypt=true to get decrypted values (detail view)
    */
   async getSecrets(
     projectId: string,
-    query: ListSecretsQuery = {}
-  ): Promise<SecretWithDecryptedValue[]> {
+    query: Partial<ListSecretsQuery> = {}
+  ): Promise<PaginatedSecrets> {
+    const { page = 1, limit = 50, envId, folderId, decrypt = false } = query;
+
     const where: Record<string, unknown> = { projectId };
+    if (envId) where.envId = envId;
+    if (folderId) where.folderId = folderId;
 
-    if (query.envId) where.envId = query.envId;
-    if (query.folderId) where.folderId = query.folderId;
+    // Get total count
+    const total = await db.secret.count({ where });
 
+    // Get paginated secrets
     const secrets = await db.secret.findMany({
       where,
       include: {
@@ -76,14 +116,62 @@ export const secretService = {
         },
       },
       orderBy: { key: 'asc' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
 
-    // Decrypt all secret values and add user info
-    return secrets.map((secret) => ({
-      ...this.decryptSecret(secret),
-      createdBy: secret.createdByUser.name || secret.createdByUser.email,
-      updatedBy: secret.updatedByUser ? (secret.updatedByUser.name || secret.updatedByUser.email) : null,
-    }));
+    // If decrypt is true, decrypt all values (for detail view)
+    // Otherwise, return list without decrypted values
+    let data: (SecretListItem | SecretWithDecryptedValue)[];
+
+    if (decrypt) {
+      // Return decrypted secrets (for detail view)
+      data = secrets.map((secret) => ({
+        ...this.decryptSecret(secret),
+        id: secret.id,
+        key: secret.key,
+        envId: secret.envId,
+        folderId: secret.folderId,
+        projectId: secret.projectId,
+        version: secret.version,
+        expiresAt: secret.expiresAt,
+        metadata: secret.metadata as Record<string, unknown> | null,
+        createdAt: secret.createdAt,
+        updatedAt: secret.updatedAt,
+        environment: secret.environment,
+        folder: secret.folder,
+        createdBy: secret.createdByUser.name || secret.createdByUser.email,
+        updatedBy: secret.updatedByUser ? (secret.updatedByUser.name || secret.updatedByUser.email) : null,
+      } as SecretWithDecryptedValue));
+    } else {
+      // Return list items without decrypted values (for list view)
+      data = secrets.map((secret) => ({
+        id: secret.id,
+        key: secret.key,
+        envId: secret.envId,
+        folderId: secret.folderId,
+        projectId: secret.projectId,
+        version: secret.version,
+        expiresAt: secret.expiresAt,
+        metadata: secret.metadata as Record<string, unknown> | null,
+        createdAt: secret.createdAt,
+        updatedAt: secret.updatedAt,
+        environment: secret.environment,
+        folder: secret.folder,
+        createdBy: secret.createdByUser.name || secret.createdByUser.email,
+        updatedBy: secret.updatedByUser ? (secret.updatedByUser.name || secret.updatedByUser.email) : null,
+      } as SecretListItem));
+    }
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   },
 
   /**

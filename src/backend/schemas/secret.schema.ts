@@ -31,6 +31,9 @@ export type UpdateSecretInput = z.infer<typeof updateSecretSchema>;
 export const listSecretsQuerySchema = z.object({
   envId: z.string().optional(),
   folderId: z.string().optional(),
+  page: z.coerce.number().min(1).default(1),
+  limit: z.coerce.number().min(1).max(100).default(50),
+  decrypt: z.coerce.boolean().optional().default(false),
 });
 
 export type ListSecretsQuery = z.infer<typeof listSecretsQuerySchema>;

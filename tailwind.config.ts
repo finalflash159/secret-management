@@ -10,12 +10,12 @@ const config: Config = {
   theme: {
     extend: {
       fontSize: {
-        'xs': '11px',
-        'sm': '12px',
-        'base': '13px',
-        'lg': '15px',
-        'xl': '18px',
-        '2xl': '22px',
+        'xs': '12px',
+        'sm': '13px',
+        'base': '14px',
+        'lg': '16px',
+        'xl': '20px',
+        '2xl': '24px',
       },
       fontWeight: {
         'normal': '400',

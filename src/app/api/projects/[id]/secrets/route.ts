@@ -7,6 +7,13 @@ import { secretService, auditService } from '@/backend/services';
 /**
  * GET /api/projects/[id]/secrets - List secrets in a project
  * POST /api/projects/[id]/secrets - Create a new secret
+ *
+ * Query params:
+ * - envId: Filter by environment
+ * - folderId: Filter by folder
+ * - page: Page number (default: 1)
+ * - limit: Items per page (default: 50, max: 100)
+ * - decrypt: Set to 'true' to decrypt values (default: false for performance)
  */
 export async function GET(
   req: NextRequest,
@@ -20,10 +27,13 @@ export async function GET(
     const query = listSecretsQuerySchema.parse({
       envId: searchParams.get('envId') || undefined,
       folderId: searchParams.get('folderId') || undefined,
+      page: searchParams.get('page') || undefined,
+      limit: searchParams.get('limit') || undefined,
+      decrypt: searchParams.get('decrypt') || undefined,
     });
 
-    const secrets = await secretService.getSecrets(projectId, query);
-    return success(secrets);
+    const result = await secretService.getSecrets(projectId, query);
+    return success(result);
   } catch (err) {
     console.error('Get secrets error:', err);
     const response = handleAuthError(err);

@@ -124,3 +124,23 @@ export async function verifyPassword(
 ): Promise<boolean> {
   return bcrypt.compare(password, hash);
 }
+
+/**
+ * Encrypt a JSON object
+ * Returns encrypted string that can be stored in database
+ */
+export function encryptJson(obj: unknown, key: Buffer = getMasterKey()): string {
+  const jsonString = JSON.stringify(obj);
+  const encrypted = encrypt(jsonString, key);
+  return JSON.stringify(encrypted);
+}
+
+/**
+ * Decrypt a JSON object
+ * Takes encrypted string from database and returns original object
+ */
+export function decryptJson<T>(encryptedStr: string, key: Buffer = getMasterKey()): T {
+  const { ciphertext, iv, tag } = JSON.parse(encryptedStr);
+  const decrypted = decrypt(ciphertext, key, iv, tag);
+  return JSON.parse(decrypted) as T;
+}

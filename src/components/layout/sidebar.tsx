@@ -143,9 +143,9 @@ function SidebarComponent({ user, collapsed = false, organizationSlug, unreadAle
       {/* Top Section - Logo & Org Selector */}
       <div className="border-b border-border">
         {/* Logo & Brand */}
-        <div className="flex items-center gap-3 px-4 py-4">
-          <Logo width={32} height={32} />
-          <span className="text-lg font-extrabold tracking-tight text-foreground">Gondor</span>
+        <div className="flex items-center gap-3 px-4 py-5">
+          <Logo width={48} height={48} />
+          <span className="text-3xl font-extrabold tracking-tight text-foreground">Gondor</span>
         </div>
 
         {/* Organization Selector */}

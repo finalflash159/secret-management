@@ -63,6 +63,7 @@ export default function AuditLogsPage() {
 
   useEffect(() => {
     fetchLogs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
   const getActionColor = (action: string) => {

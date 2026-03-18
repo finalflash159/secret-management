@@ -1,47 +1,365 @@
 'use client';
 
-import { Github, Cloud, MessageSquare } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'next/navigation';
+import Image from 'next/image';
+import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Modal } from '@/components/ui/modal';
+import { useToast } from '@/components/ui/toast';
+import { integrationTypes } from '@/config/integrations';
+
+interface Integration {
+  id: string;
+  type: string;
+  name: string;
+  isActive: boolean;
+  lastSyncAt: string | null;
+  createdAt: string;
+  _count: {
+    syncs: number;
+  };
+}
+
+interface IntegrationType {
+  id: string;
+  name: string;
+  logo: string;
+  description: string;
+  hasBg: boolean;
+  bgColor?: string;
+  fields: { key: string; label: string; type: string; placeholder: string }[];
+}
 
 export default function IntegrationsPage() {
+  const params = useParams();
+  const slug = params.slug as string;
+  const { addToast } = useToast();
 
-  const integrations = [
-    { id: 'github', name: 'GitHub', icon: Github, description: 'CI/CD and secrets sync' },
-    { id: 'aws', name: 'AWS Secrets Manager', icon: Cloud, description: 'Sync with AWS Secrets Manager' },
-    { id: 'gcp', name: 'GCP Secret Manager', icon: Cloud, description: 'Sync with Google Cloud' },
-    { id: 'azure', name: 'Azure Key Vault', icon: Cloud, description: 'Sync with Azure Key Vault' },
-    { id: 'slack', name: 'Slack', icon: MessageSquare, description: 'Notifications and alerts' },
-  ];
+  const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const [testing, setTesting] = useState<string | null>(null);
+
+  // Modal states
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedType, setSelectedType] = useState<string>('');
+  const [saving, setSaving] = useState(false);
+
+  // Form state
+  const [integrationName, setIntegrationName] = useState('');
+  const [config, setConfig] = useState<Record<string, string>>({});
+
+  const fetchIntegrations = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/organizations/${slug}/integrations`);
+      if (res.ok) {
+        const json = await res.json();
+        setIntegrations(json?.data ?? json);
+      }
+    } catch (err) {
+      console.error('Failed to fetch integrations:', err);
+    }
+  }, [slug]);
+
+  useEffect(() => {
+    fetchIntegrations();
+  }, [fetchIntegrations]);
+
+  const getIntegrationType = (typeId: string): IntegrationType | undefined => {
+    return integrationTypes.find(t => t.id === typeId) as IntegrationType | undefined;
+  };
+
+  const resetForm = () => {
+    setIntegrationName('');
+    setConfig({});
+    setSelectedType('');
+  };
+
+  const openCreateModal = (typeId: string) => {
+    setSelectedType(typeId);
+    const type = getIntegrationType(typeId);
+    if (type) {
+      setIntegrationName(type.name);
+      setConfig({});
+    }
+    setShowCreateModal(true);
+  };
+
+  const handleConfigChange = (key: string, value: string) => {
+    setConfig(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleCreateIntegration = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/organizations/${slug}/integrations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: selectedType,
+          name: integrationName,
+          config,
+        }),
+      });
+
+      if (res.ok) {
+        addToast({ title: 'Integration created', variant: 'success' });
+        setShowCreateModal(false);
+        resetForm();
+        fetchIntegrations();
+      } else {
+        const data = await res.json();
+        addToast({ title: data.error || 'Failed to create', variant: 'error' });
+      }
+    } catch {
+      addToast({ title: 'An error occurred', variant: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteIntegration = async (integration: Integration) => {
+    if (!confirm(`Are you sure you want to disconnect "${integration.name}"?`)) return;
+
+    try {
+      const res = await fetch(`/api/organizations/${slug}/integrations/${integration.id}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        addToast({ title: 'Integration disconnected', variant: 'success' });
+        fetchIntegrations();
+      } else {
+        const data = await res.json();
+        addToast({ title: data.error || 'Failed to disconnect', variant: 'error' });
+      }
+    } catch {
+      addToast({ title: 'An error occurred', variant: 'error' });
+    }
+  };
+
+  const handleTestConnection = async (integration: Integration) => {
+    setTesting(integration.id);
+    try {
+      const res = await fetch(
+        `/api/organizations/${slug}/integrations/${integration.id}?action=test`,
+        { method: 'POST' }
+      );
+
+      if (res.ok) {
+        addToast({ title: 'Connection successful', variant: 'success' });
+      } else {
+        const data = await res.json();
+        addToast({ title: data.error || 'Connection failed', variant: 'error' });
+      }
+    } catch {
+      addToast({ title: 'An error occurred', variant: 'error' });
+    } finally {
+      setTesting(null);
+    }
+  };
+
+  const isConnected = (typeId: string) => {
+    return integrations.some(i => i.type === typeId);
+  };
+
+  const selectedTypeData = getIntegrationType(selectedType);
 
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-bold text-foreground">Integrations</h1>
+        <h1 className="text-2xl font-bold text-foreground">Integrations</h1>
         <p className="text-sm text-muted-foreground">Connect with external services and tools</p>
       </div>
 
+      {/* Connected Integrations */}
+      {integrations.length > 0 && (
+        <Card className="bg-card border-border">
+          <CardContent className="p-4">
+            <h2 className="text-base font-semibold text-foreground mb-3">Connected</h2>
+            <div className="space-y-3">
+              {integrations.map((integration) => {
+                const type = getIntegrationType(integration.type);
+                return (
+                  <div
+                    key={integration.id}
+                    className="flex items-center justify-between p-5 rounded-lg bg-muted/50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`p-4 rounded-lg ${type?.hasBg ? (type.bgColor ? '' : 'bg-white') : ''}`} style={type?.bgColor ? { backgroundColor: type.bgColor } : undefined}>
+                        {type?.logo && (
+                          <Image
+                            src={type.logo}
+                            alt={type.name}
+                            width={56}
+                            height={56}
+                            className="h-14 w-14"
+                          />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-foreground">{integration.name}</p>
+                        <p className="text-xl text-muted-foreground">
+                          {integration.lastSyncAt
+                            ? `Last sync: ${new Date(integration.lastSyncAt).toLocaleString()}`
+                            : 'Never synced'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {integration.isActive ? (
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <XCircle className="h-5 w-5 text-muted-foreground" />
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleTestConnection(integration)}
+                        disabled={testing === integration.id}
+                      >
+                        {testing === integration.id ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-5 w-5" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-9 w-9 p-0 text-muted-foreground hover:text-danger"
+                        onClick={() => handleDeleteIntegration(integration)}
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Available Integrations */}
       <Card className="bg-card border-border">
-        <CardContent className="p-8 text-center">
-          <Cloud className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Integrations Coming Soon</h3>
-          <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6">
-            Connect your favorite tools and services to sync secrets automatically.
-            Available integrations:
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
-            {integrations.map((integration) => {
-              const Icon = integration.icon;
+        <CardContent className="p-4">
+          <h2 className="text-base font-semibold text-foreground mb-3">Available Integrations</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+            {(integrationTypes as IntegrationType[]).map((type) => {
+              const connected = isConnected(type.id);
               return (
-                <div key={integration.id} className="p-4 rounded-lg bg-muted text-center">
-                  <Icon className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm font-medium text-foreground">{integration.name}</p>
-                  <p className="text-xs text-muted-foreground">{integration.description}</p>
+                <div
+                  key={type.id}
+                  className={`p-4 rounded-lg border ${
+                    connected
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-muted-foreground/50'
+                  } transition-colors`}
+                >
+                  <div className="text-center">
+                    <div className={`p-5 rounded-lg mx-auto w-fit ${type.hasBg ? (type.bgColor ? '' : 'bg-white') : ''}`} style={type.bgColor ? { backgroundColor: type.bgColor } : undefined}>
+                      <Image
+                        src={type.logo}
+                        alt={type.name}
+                        width={48}
+                        height={48}
+                        className="h-12 w-12"
+                      />
+                    </div>
+                    <p className="text-xl font-bold text-foreground mt-3">{type.name}</p>
+                    <p className="text-base text-muted-foreground mt-1">{type.description}</p>
+                    {connected ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 w-full"
+                        disabled
+                      >
+                        <CheckCircle className="h-5 w-5 mr-2" />
+                        Connected
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 w-full"
+                        onClick={() => openCreateModal(type.id)}
+                      >
+                        <Plus className="h-5 w-5 mr-2" />
+                        Connect
+                      </Button>
+                    )}
+                  </div>
                 </div>
               );
             })}
           </div>
         </CardContent>
       </Card>
+
+      {/* Create Integration Modal */}
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => { setShowCreateModal(false); resetForm(); }}
+        title={`Connect ${selectedTypeData?.name || 'Integration'}`}
+      >
+        <form onSubmit={handleCreateIntegration} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="name">Name</Label>
+            <Input
+              id="name"
+              value={integrationName}
+              onChange={(e) => setIntegrationName(e.target.value)}
+              placeholder="My Integration"
+              required
+            />
+          </div>
+
+          {selectedTypeData?.fields.map((field) => (
+            <div key={field.key} className="space-y-1.5">
+              <Label htmlFor={field.key}>{field.label}</Label>
+              {field.type === 'textarea' ? (
+                <textarea
+                  id={field.key}
+                  value={config[field.key] || ''}
+                  onChange={(e) => handleConfigChange(field.key, e.target.value)}
+                  placeholder={field.placeholder}
+                  className="flex min-h-[80px] w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                  required
+                />
+              ) : (
+                <Input
+                  id={field.key}
+                  type={field.type}
+                  value={config[field.key] || ''}
+                  onChange={(e) => handleConfigChange(field.key, e.target.value)}
+                  placeholder={field.placeholder}
+                  required
+                />
+              )}
+            </div>
+          ))}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => { setShowCreateModal(false); resetForm(); }}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saving} size="sm">
+              {saving ? 'Connecting...' : 'Connect'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

@@ -50,95 +50,95 @@ img,
 }
 
 :root {
-  /* ─── Base Colors ─── */
-  --color-background: #fafaf8;
-  --color-foreground: #0d0d10;
+  /* ─── Base Colors - Light Theme (Enhanced Contrast) ─── */
+  --color-background: #f5f5f3;
+  --color-foreground: #0a0a0c;
   --color-card: #ffffff;
-  --color-surface: #f5f3ed;
-  --color-border: #e8e3d8;
-  --color-border-hover: #d0ccc0;
+  --color-surface: #ebebea;
+  --color-border: #d4d1c8;
+  --color-border-hover: #b8b4aa;
 
   /* ─── Primary (Dark in light mode) ─── */
-  --color-primary: #0d0d10;
-  --color-primary-foreground: #f5f3ed;
+  --color-primary: #0a0a0c;
+  --color-primary-foreground: #f8f8f6;
 
   /* ─── Accent Colors ─── */
-  --color-gold: #c8a96e;
-  --color-gold-hover: #b89558;
-  --color-accent: #f5f3ed;
-  --color-accent-foreground: #0d0d10;
+  --color-gold: #b8963d;
+  --color-gold-hover: #9a7a2e;
+  --color-accent: #ebebea;
+  --color-accent-foreground: #0a0a0c;
 
   /* ─── Secondary ─── */
-  --color-secondary: #f0ede6;
-  --color-secondary-foreground: #0d0d10;
+  --color-secondary: #e3e1dc;
+  --color-secondary-foreground: #0a0a0c;
 
-  /* ─── Muted ─── */
-  --color-muted: #f0ede6;
-  --color-muted-foreground: #888888;
+  /* ─── Muted (More visible) ─── */
+  --color-muted: #e3e1dc;
+  --color-muted-foreground: #5a5854;
 
   /* ─── Semantic Colors ─── */
-  --color-success: #3dd68c;
+  --color-success: #22c55e;
   --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+
+  /* ─── Environment Colors ─── */
+  --color-prod: #22c55e;
+  --color-dev: #3b82f6;
+  --color-staging: #8b5cf6;
+  --color-test: #6d28d9;
+
+  /* ─── UI Elements ─── */
+  --color-input: #d4d1c8;
+  --color-ring: #0a0a0c;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0a0a0c;
+}
+
+/* ─── Dark Theme (Enhanced Contrast) ─── */
+[data-theme="dark"] {
+  --color-background: #08080a;
+  --color-foreground: #f0f0ed;
+  --color-card: #141417;
+  --color-surface: #1c1c20;
+  --color-border: #2a2a30;
+  --color-border-hover: #3e3e46;
+
+  /* ─── Primary (Light in dark mode) ─── */
+  --color-primary: #f0f0ed;
+  --color-primary-foreground: #08080a;
+
+  /* ─── Accent Colors ─── */
+  --color-gold: #d4a84b;
+  --color-gold-hover: #e8bc5c;
+  --color-accent: #1c1c20;
+  --color-accent-foreground: #f0f0ed;
+
+  /* ─── Secondary ─── */
+  --color-secondary: #1c1c20;
+  --color-secondary-foreground: #f0f0ed;
+
+  /* ─── Muted (More visible) ─── */
+  --color-muted: #1c1c20;
+  --color-muted-foreground: #9a9a96;
+
+  /* ─── Semantic Colors ─── */
+  --color-success: #4ade80;
+  --color-warning: #fbbf24;
   --color-danger: #f87171;
   --color-info: #60a5fa;
 
   /* ─── Environment Colors ─── */
-  --color-prod: #3dd68c;
+  --color-prod: #4ade80;
   --color-dev: #60a5fa;
   --color-staging: #a78bfa;
-  --color-test: #7c3aed;
+  --color-test: #8b5cf6;
 
   /* ─── UI Elements ─── */
-  --color-input: #e8e3d8;
-  --color-ring: #0d0d10;
-  --color-popover: #ffffff;
-  --color-popover-foreground: #0d0d10;
-}
-
-/* ─── Dark Theme ─── */
-[data-theme="dark"] {
-  --color-background: #0d0d10;
-  --color-foreground: #f5f3ed;
-  --color-card: #16181a;
-  --color-surface: #222224;
-  --color-border: #2b2c30;
-  --color-border-hover: #3f3f46;
-
-  /* ─── Primary (Light in dark mode) ─── */
-  --color-primary: #f5f3ed;
-  --color-primary-foreground: #0d0d10;
-
-  /* ─── Accent Colors ─── */
-  --color-gold: #c8a96e;
-  --color-gold-hover: #d4b87c;
-  --color-accent: #222224;
-  --color-accent-foreground: #f5f3ed;
-
-  /* ─── Secondary ─── */
-  --color-secondary: #222224;
-  --color-secondary-foreground: #f5f3ed;
-
-  /* ─── Muted ─── */
-  --color-muted: #222224;
-  --color-muted-foreground: #666666;
-
-  /* ─── Semantic Colors (keep same) ─── */
-  --color-success: #3dd68c;
-  --color-warning: #f59e0b;
-  --color-danger: #f87171;
-  --color-info: #60a5fa;
-
-  /* ─── Environment Colors (keep same) ─── */
-  --color-prod: #3dd68c;
-  --color-dev: #60a5fa;
-  --color-staging: #a78bfa;
-  --color-test: #7c3aed;
-
-  /* ─── UI Elements ─── */
-  --color-input: #2b2c30;
-  --color-ring: #f5f3ed;
-  --color-popover: #16181a;
-  --color-popover-foreground: #f5f3ed;
+  --color-input: #2a2a30;
+  --color-ring: #f0f0ed;
+  --color-popover: #141417;
+  --color-popover-foreground: #f0f0ed;
 }
 
 /* ============================================
@@ -151,7 +151,7 @@ img,
 
 html {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 body {
