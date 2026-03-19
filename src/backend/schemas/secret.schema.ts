@@ -10,7 +10,21 @@ export const createSecretSchema = z.object({
   value: z.string().min(1, 'Value is required').max(50000), // Increased to support long keys like RSA
   envId: z.string().min(1, 'Environment ID is required'),
   folderId: z.string().optional(),
-  expiresAt: z.string().datetime().optional(), // ISO date string
+  // Accepts ISO datetime strings, date-only strings (YYYY-MM-DD), or unix timestamps
+  expiresAt: z.string().optional().refine(
+    (val) => {
+      if (!val || val === '') return true;
+      // Accept ISO datetime (with or without time)
+      const isoDate = new Date(val);
+      if (!isNaN(isoDate.getTime())) return true;
+      // Accept YYYY-MM-DD date
+      if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return true;
+      // Accept unix timestamp in seconds or milliseconds
+      if (/^\d{10,13}$/.test(val)) return true;
+      return false;
+    },
+    { message: 'Invalid date format. Use YYYY-MM-DD, ISO datetime, or leave empty.' }
+  ),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 

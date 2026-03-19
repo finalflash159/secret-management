@@ -966,7 +966,48 @@ export default function ProjectSecretsPage() {
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="expiresAt">Expiration Date (Optional)</Label>
+            <Label>Expiration (Optional)</Label>
+            {/* Quick select chips */}
+            <div className="flex flex-wrap gap-1 mb-2">
+              {[
+                { label: 'None', value: '' },
+                { label: '7 days', value: '7d' },
+                { label: '30 days', value: '30d' },
+                { label: '90 days', value: '90d' },
+                { label: '1 year', value: '365d' },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    if (opt.value === '') {
+                      setSecretExpiresAt('');
+                    } else {
+                      const days = parseInt(opt.value);
+                      const d = new Date();
+                      d.setDate(d.getDate() + days);
+                      setSecretExpiresAt(d.toISOString().split('T')[0]);
+                    }
+                  }}
+                  className={`px-2 py-0.5 text-xs rounded border transition-colors ${
+                    secretExpiresAt === ''
+                      ? opt.value === ''
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-muted border-border hover:border-primary/50'
+                      : opt.value !== '' && (() => {
+                          const days = parseInt(opt.value);
+                          const d = new Date();
+                          d.setDate(d.getDate() + days);
+                          return secretExpiresAt === d.toISOString().split('T')[0];
+                        })()
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-muted border-border hover:border-primary/50'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
             <Input
               id="expiresAt"
               type="date"
@@ -974,7 +1015,11 @@ export default function ProjectSecretsPage() {
               onChange={(e) => setSecretExpiresAt(e.target.value)}
               className="h-8"
             />
-            <p className="text-xs text-muted-foreground">Secret will show as expiring after this date</p>
+            <p className="text-xs text-muted-foreground">
+              {secretExpiresAt
+                ? `Expires on ${new Date(secretExpiresAt + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                : 'No expiration'}
+            </p>
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <Button type="button" variant="outline" size="sm" onClick={() => { setShowSecretModal(false); setEditingSecret(null); setSecretExpiresAt(''); setShowValue(false); }}>

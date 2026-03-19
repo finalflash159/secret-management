@@ -264,6 +264,15 @@ export const secretService = {
     const encrypted = encrypt(data.value);
     const encryptedValue = JSON.stringify(encrypted);
 
+    // Normalize expiresAt to ISO datetime string
+    let normalizedExpiresAt: Date | null = null;
+    if (data.expiresAt && data.expiresAt !== '') {
+      const parsed = new Date(data.expiresAt);
+      if (!isNaN(parsed.getTime())) {
+        normalizedExpiresAt = parsed;
+      }
+    }
+
     // Create secret with initial version
     const secret = await db.secret.create({
       data: {
@@ -273,7 +282,7 @@ export const secretService = {
         folderId,
         projectId,
         createdBy: userId,
-        expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
+        expiresAt: normalizedExpiresAt,
         metadata: data.metadata as object | undefined,
         versions: {
           create: {

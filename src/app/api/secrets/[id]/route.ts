@@ -58,9 +58,6 @@ export async function PUT(
 
     const secret = await secretService.update(id, data, user.id);
 
-    // Log the update
-    await auditService.logSecretUpdated(id, secret.key, user.id, secret.projectId);
-
     return success(secret);
   } catch (err) {
     console.error('Update secret error:', err);
@@ -89,12 +86,9 @@ export async function DELETE(
     }
 
     // Check delete access
-    const { user } = await requireProjectAccess(existingSecret.projectId, 'secret:delete');
+    await requireProjectAccess(existingSecret.projectId, 'secret:delete');
 
     await secretService.delete(id, existingSecret.projectId);
-
-    // Log the deletion
-    await auditService.logSecretDeleted(id, existingSecret.key, user.id, existingSecret.projectId);
 
     return success({ success: true });
   } catch (err) {
