@@ -2,7 +2,7 @@
 
 A modern, secure secret management application for teams and organizations. Store, organize, and manage your sensitive credentials with enterprise-grade encryption.
 
-![Gondor Secret Management](./docs/images/Gondor-previewpng.png)
+![Gondor Secret Management](./docs/images/Gondor-pm-preview.png)
 
 ## Features
 
