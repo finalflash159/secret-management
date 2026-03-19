@@ -1,22 +1,43 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16
-    container_name: secret-manager-postgres
+    container_name: local-secret-manager-postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: secret_manager
+    # Keep this exposed ONLY for local development to use DBeaver/Prisma Studio
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - postgres_data_local:/var/lib/postgresql/data
+
+  app:
+    build:
+      context: .
+      # Point to the development Dockerfile
+      dockerfile: Dockerfile.dev
+    container_name: local-gondor-next-app
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/secret_manager
+      NODE_ENV: development
+      AUTH_SECRET: "local_secret_key_123"
+      AUTH_TRUST_HOST: "true"
+      PRISMA_CLI_QUERY_ENGINE_TYPE: binary
+      PRISMA_CLIENT_ENGINE_TYPE: binary
+      ALLOW_SELF_REGISTRATION: "true"
+    # Volume mounts for Hot-Reloading (Next.js Fast Refresh)
+    volumes:
+      # Map the entire current directory to /app inside the container
+      - ./:/app
+      # Prevent the host's node_modules from overwriting the container's node_modules
+      - /app/node_modules
+    # Run Prisma sync before starting the dev server
+    command: sh -c "npx prisma@5.22.0 db push --schema=/app/node_modules/.prisma/client/schema.prisma && npm run dev"
 
 volumes:
-  postgres_data:
+  postgres_data_local:
