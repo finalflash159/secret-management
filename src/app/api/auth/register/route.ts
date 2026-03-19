@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { hashPassword } from '@/lib/encryption';
 import { invitationService } from '@/backend/services';
 import { z } from 'zod';
+import { checkRateLimit, registerRateLimiter } from '@/backend/middleware/rate-limit';
 
 const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -14,6 +15,25 @@ const registerSchema = z.object({
 // Only allow registration with valid invite code
 // To create first admin, use the seed script
 export async function POST(req: NextRequest) {
+  // Rate limit check
+  const rateLimit = checkRateLimit(registerRateLimiter, req);
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      {
+        error: registerRateLimiter.message,
+        retryAfterMs: rateLimit.retryAfterMs,
+      },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': Math.ceil((rateLimit.retryAfterMs || 0) / 1000).toString(),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': rateLimit.resetAt.toString(),
+        },
+      }
+    );
+  }
+
   try {
     const body = await req.json();
     const validatedData = registerSchema.parse(body);
