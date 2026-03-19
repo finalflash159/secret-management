@@ -26,6 +26,23 @@ npx prisma db push                       # Push schema changes (prototyping)
 
 ## Architecture
 
+### Data Fetching
+- **React Query** (`@tanstack/react-query`) — All hooks use `useQuery`/`useMutation`
+- Hooks: `src/hooks/useOrganization.ts`, `src/hooks/useProjects.ts`, `src/hooks/useSecrets.ts`
+- Query Provider: `src/lib/query-provider.tsx`
+- Default stale time: 60s, gcTime: 5min
+
+### Security
+- **Rate Limiting**: In-memory sliding window at `src/backend/middleware/rate-limit.ts`
+  - `loginRateLimiter`: 5 req/min per IP
+  - `registerRateLimiter`: 3 req/min per IP
+- **Encryption**: AES-256-GCM — `encryptJson`/`decryptJson` for JSON objects
+- All sensitive configs (DynamicSecret, Integration) are encrypted at rest
+
+### Performance
+- **Database Indexes**: 15 indexes on high-traffic query patterns (see `prisma/schema.prisma`)
+- **Secrets Pagination**: List API returns encrypted list by default, decrypt only on detail view
+
 ### Data Model
 ```
 Organization (top-level container)
@@ -59,17 +76,18 @@ Organization (top-level container)
 src/
 ├── backend/               # Backend layer
 │   ├── services/         # Business logic
-│   ├── middleware/       # Auth & permissions
-│   ├── schemas/         # Zod validation
-│   └── utils/          # Utilities
+│   ├── middleware/       # Auth, permissions, rate limiting
+│   ├── schemas/          # Zod validation
+│   └── utils/            # Utilities
 ├── app/                  # Next.js App Router
-│   ├── api/            # API routes
-│   ├── (auth)/         # Auth pages
-│   └── (dashboard)/    # Protected pages
-├── components/           # React components
-│   ├── ui/             # Base UI
-│   └── layout/         # Layout components
-└── lib/                 # Shared utilities
+│   ├── api/              # API routes
+│   ├── (auth)/           # Auth pages
+│   └── (dashboard)/      # Protected pages
+├── components/            # React components
+│   ├── ui/               # Base UI
+│   └── layout/           # Layout components
+├── hooks/                 # React hooks (React Query based)
+└── lib/                   # Shared utilities
 ```
 
 ### API Patterns
@@ -104,8 +122,12 @@ src/app/
 PostgreSQL with Prisma ORM. Key models:
 - User, Organization, Project, ProjectEnvironment
 - Folder, Secret, SecretVersion
-- Role, ProjectMember, OrgMember
+- Role, ProjectMember, OrgMember, OrgInvitation
 - AuditLog, Alert
+- DynamicSecret, DynamicSecretCredential, RotationJob, RotationLog
+- Integration, IntegrationSync
+
+**Database Indexes**: 15 indexes on high-traffic queries (Secret, AuditLog, Folder, DynamicSecret, RotationJob, Project, ProjectMember, Role, SecretVersion, InvitationUse, IntegrationSync)
 
 ## Environment Variables
 
