@@ -29,7 +29,9 @@ services:
       AUTH_TRUST_HOST: "true"
       PRISMA_CLI_QUERY_ENGINE_TYPE: binary
       PRISMA_CLIENT_ENGINE_TYPE: binary
-      ALLOW_SELF_REGISTRATION: "true"
+      # ── Master Invite Code (single-use, first user = admin) ────────────────────
+      ALLOW_SELF_REGISTRATION: "false"
+      MASTER_INVITE_CODE: "dev_master_123"
     # Volume mounts for Hot-Reloading (Next.js Fast Refresh)
     volumes:
       # Map the entire current directory to /app inside the container

@@ -58,6 +58,14 @@ Set `MASTER_INVITE_CODE` to enable single-use master admin registration. When se
 
 ---
 
+### Cron Jobs
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `CRON_SECRET` | Bearer token secret for protecting the rotation cron endpoint | Run: `openssl rand -hex 32` |
+
+---
+
 ## Generating Secrets
 
 ### NEXTAUTH_SECRET
@@ -91,6 +99,7 @@ Before deploying to production, ensure:
 - [ ] `DATABASE_URL` points to a production PostgreSQL instance
 - [ ] `NEXTAUTH_URL` is set to your production domain
 - [ ] `NODE_ENV` is set to `production`
+- [ ] `CRON_SECRET` is set to a strong random value (for rotation cron endpoint)
 
 ---
 
@@ -106,6 +115,13 @@ NEXTAUTH_SECRET="your-secure-random-secret-at-least-32-chars"
 
 # Encryption (master key for AES-256-GCM)
 MASTER_KEY="your-64-character-hex-master-key"
+
+# Registration
+ALLOW_SELF_REGISTRATION="false"
+MASTER_INVITE_CODE="your-secure-invite-code"
+
+# Cron Jobs
+CRON_SECRET="your-64-character-hex-cron-secret"
 
 # Application
 NODE_ENV="production"
