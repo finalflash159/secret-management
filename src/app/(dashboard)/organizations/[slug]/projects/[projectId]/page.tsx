@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Modal } from '@/components/ui/modal';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Badge } from '@/components/ui/badge';
 import {
   Eye,
@@ -104,6 +105,11 @@ export default function ProjectSecretsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
+
+  // Confirm modals
+  const [confirmDeleteSecret, setConfirmDeleteSecret] = useState<string | null>(null);
+  const [confirmDeleteEnv, setConfirmDeleteEnv] = useState<string | null>(null);
+  const [confirmRemoveMember, setConfirmRemoveMember] = useState<string | null>(null);
 
   // Fetch audit logs for selected secret
   useEffect(() => {
@@ -263,8 +269,9 @@ export default function ProjectSecretsPage() {
     }
   };
 
-  const handleDeleteSecret = async (secretId: string) => {
-    if (!confirm('Delete this secret?')) return;
+  const handleDeleteSecret = async () => {
+    const secretId = confirmDeleteSecret;
+    if (!secretId) return;
     try {
       const res = await fetch(`/api/secrets/${secretId}`, { method: 'DELETE' });
       if (res.ok) {
@@ -272,6 +279,7 @@ export default function ProjectSecretsPage() {
         if (selectedSecret?.id === secretId) {
           setSelectedSecret(null);
         }
+        setConfirmDeleteSecret(null);
       }
     } catch (err) {
       console.error('Failed to delete:', err);
@@ -346,14 +354,16 @@ export default function ProjectSecretsPage() {
     }
   };
 
-  const handleDeleteEnv = async (envId: string) => {
-    if (!confirm('Are you sure? This will delete all secrets in this environment.')) return;
+  const handleDeleteEnv = async () => {
+    const envId = confirmDeleteEnv;
+    if (!envId) return;
     try {
       const res = await fetch(`/api/projects/${projectId}/environments/${envId}`, {
         method: 'DELETE',
       });
       if (res.ok) {
         fetchProjectData();
+        setConfirmDeleteEnv(null);
       }
     } catch {
       setError('Failed to delete environment');
@@ -431,14 +441,16 @@ export default function ProjectSecretsPage() {
     }
   };
 
-  const handleRemoveMember = async (memberId: string) => {
-    if (!confirm('Remove this member?')) return;
+  const handleRemoveMember = async () => {
+    const memberId = confirmRemoveMember;
+    if (!memberId) return;
     try {
       const res = await fetch(`/api/projects/${projectId}/members/${memberId}`, {
         method: 'DELETE',
       });
       if (res.ok) {
         fetchTeamMembers();
+        setConfirmRemoveMember(null);
       }
     } catch {
       setError('Failed to remove member');
@@ -790,7 +802,7 @@ export default function ProjectSecretsPage() {
                     )}
                     {canDelete && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); handleDeleteSecret(secret.id); }}
+                        onClick={(e) => { e.stopPropagation(); setConfirmDeleteSecret(secret.id); }}
                         className="p-1.5 rounded hover:bg-danger/20"
                       >
                         <Trash2 className="h-4 w-4 text-danger" />
@@ -956,7 +968,7 @@ export default function ProjectSecretsPage() {
                 variant="ghost"
                 size="sm"
                 className="text-danger hover:bg-danger/10"
-                onClick={() => handleDeleteSecret(selectedSecret.id)}
+                onClick={() => setConfirmDeleteSecret(selectedSecret.id)}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -1114,7 +1126,7 @@ export default function ProjectSecretsPage() {
                     <span className="text-xs text-muted-foreground">({env.slug})</span>
                   </div>
                   <button
-                    onClick={() => handleDeleteEnv(env.id)}
+                    onClick={() => { setConfirmDeleteEnv(env.id); }}
                     className="text-xs text-danger hover:text-danger/80"
                   >
                     Delete
@@ -1214,7 +1226,7 @@ export default function ProjectSecretsPage() {
                   </select>
                 </div>
                 <button
-                  onClick={() => handleRemoveMember(member.id)}
+                  onClick={() => setConfirmRemoveMember(member.id)}
                   className="text-xs text-danger hover:text-danger/80 ml-2"
                 >
                   Remove
@@ -1317,6 +1329,35 @@ export default function ProjectSecretsPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Confirm Modals */}
+      <ConfirmModal
+        isOpen={confirmDeleteSecret !== null}
+        onClose={() => setConfirmDeleteSecret(null)}
+        onConfirm={handleDeleteSecret}
+        title="Delete Secret"
+        description="This action cannot be undone. The secret will be permanently deleted."
+        confirmText="Delete"
+        variant="danger"
+      />
+      <ConfirmModal
+        isOpen={confirmDeleteEnv !== null}
+        onClose={() => setConfirmDeleteEnv(null)}
+        onConfirm={handleDeleteEnv}
+        title="Delete Environment"
+        description="This will permanently delete the environment and all its secrets."
+        confirmText="Delete"
+        variant="danger"
+      />
+      <ConfirmModal
+        isOpen={confirmRemoveMember !== null}
+        onClose={() => setConfirmRemoveMember(null)}
+        onConfirm={handleRemoveMember}
+        title="Remove Member"
+        description="This member will lose access to this project."
+        confirmText="Remove"
+        variant="danger"
+      />
     </div>
   );
 }

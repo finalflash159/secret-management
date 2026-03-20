@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Modal } from '@/components/ui/modal';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 
 interface Member {
   id: string;
@@ -38,6 +39,7 @@ export default function MembersPage() {
   const [codeExpiresInDays, setCodeExpiresInDays] = useState<number>(30);
   const [error, setError] = useState('');
   const [updatingMemberId, setUpdatingMemberId] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<{ id: string; name: string } | null>(null);
 
   const fetchMembers = useCallback(async () => {
     try {
@@ -129,13 +131,11 @@ export default function MembersPage() {
     }
   };
 
-  const handleRemoveMember = async (memberId: string, memberName: string) => {
-    if (!confirm(`Are you sure you want to remove ${memberName || 'this member'}?`)) {
-      return;
-    }
+  const handleRemoveMember = async () => {
+    if (!confirmRemove) return;
 
     try {
-      const res = await fetch(`/api/organizations/${slug}/members/${memberId}`, {
+      const res = await fetch(`/api/organizations/${slug}/members/${confirmRemove.id}`, {
         method: 'DELETE',
       });
 
@@ -147,6 +147,8 @@ export default function MembersPage() {
       }
     } catch {
       alert('An error occurred. Please try again.');
+    } finally {
+      setConfirmRemove(null);
     }
   };
 
@@ -265,7 +267,7 @@ export default function MembersPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleRemoveMember(member.id, member.user.name || member.user.email)}
+                      onClick={() => setConfirmRemove({ id: member.id, name: member.user.name || member.user.email })}
                       disabled={member.role === 'owner'}
                     >
                       <X className="h-4 w-4" />
@@ -421,6 +423,16 @@ export default function MembersPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal
+        isOpen={!!confirmRemove}
+        onClose={() => setConfirmRemove(null)}
+        onConfirm={handleRemoveMember}
+        title={`Remove "${confirmRemove?.name}"?`}
+        description="They will lose access to this organization."
+        confirmText="Remove"
+        variant="danger"
+      />
     </div>
   );
 }

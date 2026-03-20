@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Modal } from '@/components/ui/modal';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { useToast } from '@/components/ui/toast';
 
 interface Invitation {
@@ -53,6 +54,10 @@ export default function InvitationsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
 
+  // Confirm modals
+  const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null);
+  const [confirmRegenerate, setConfirmRegenerate] = useState<string | null>(null);
+
   // Form state
   const [formRole, setFormRole] = useState<'admin' | 'member'>('member');
   const [formEmail, setFormEmail] = useState('');
@@ -61,21 +66,22 @@ export default function InvitationsPage() {
 
   const fetchInvitations = useCallback(async () => {
     try {
-      const [res, sessionRes] = await Promise.all([
+      const [invRes, orgRes, sessionRes] = await Promise.all([
         fetch(`/api/organizations/${slug}/invitations`),
+        fetch(`/api/organizations/${slug}`),
         fetch('/api/auth/session'),
       ]);
-      if (res.ok) {
-        const json = await res.json();
+      if (invRes.ok) {
+        const json = await invRes.json();
         const data = json?.data ?? json;
         setInvitations(data.invitations || []);
         setStats(data.stats || { total: 0, active: 0, used: 0, expired: 0, revoked: 0 });
       }
-      if (sessionRes.ok && res.ok) {
+      if (sessionRes.ok && orgRes.ok) {
         const sessionJson = await sessionRes.json();
-        const json = await res.json();
-        const data = json?.data ?? json;
-        const myMembership = data?.members?.find(
+        const orgJson = await orgRes.json();
+        const orgData = orgJson?.data ?? orgJson;
+        const myMembership = orgData?.members?.find(
           (m: { userId: string }) => m.userId === sessionJson?.user?.id
         );
         setUserOrgRole(myMembership?.role ?? null);
@@ -123,9 +129,9 @@ export default function InvitationsPage() {
     }
   };
 
-  const handleRevoke = async (id: string) => {
-    if (!confirm('Are you sure you want to revoke this invitation?')) return;
-
+  const handleRevoke = async () => {
+    const id = confirmRevoke;
+    if (!id) return;
     try {
       const res = await fetch(`/api/organizations/${slug}/invitations/${id}`, {
         method: 'DELETE',
@@ -134,6 +140,7 @@ export default function InvitationsPage() {
       if (res.ok) {
         addToast({ title: 'Invitation revoked', variant: 'success' });
         fetchInvitations();
+        setConfirmRevoke(null);
       } else {
         const data = await res.json();
         addToast({ title: data.error || 'Failed to revoke', variant: 'error' });
@@ -143,9 +150,9 @@ export default function InvitationsPage() {
     }
   };
 
-  const handleRegenerate = async (id: string) => {
-    if (!confirm('Generate a new code for this invitation? The old code will no longer work.')) return;
-
+  const handleRegenerate = async () => {
+    const id = confirmRegenerate;
+    if (!id) return;
     try {
       const res = await fetch(`/api/organizations/${slug}/invitations/${id}/regenerate`, {
         method: 'POST',
@@ -154,6 +161,7 @@ export default function InvitationsPage() {
       if (res.ok) {
         addToast({ title: 'Code regenerated', variant: 'success' });
         fetchInvitations();
+        setConfirmRegenerate(null);
       } else {
         const data = await res.json();
         addToast({ title: data.error || 'Failed to regenerate', variant: 'error' });
@@ -351,7 +359,7 @@ export default function InvitationsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleRegenerate(invitation.id)}
+                          onClick={() => setConfirmRegenerate(invitation.id)}
                           title="Regenerate code"
                           disabled={invitation.isRevoked}
                         >
@@ -360,7 +368,7 @@ export default function InvitationsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleRevoke(invitation.id)}
+                          onClick={() => setConfirmRevoke(invitation.id)}
                           title="Revoke"
                           disabled={invitation.isRevoked}
                           className="text-muted-foreground hover:text-red-500"
@@ -450,6 +458,26 @@ export default function InvitationsPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Confirm Modals */}
+      <ConfirmModal
+        isOpen={confirmRevoke !== null}
+        onClose={() => setConfirmRevoke(null)}
+        onConfirm={handleRevoke}
+        title="Revoke Invitation"
+        description="This invitation code will no longer work. This action cannot be undone."
+        confirmText="Revoke"
+        variant="danger"
+      />
+      <ConfirmModal
+        isOpen={confirmRegenerate !== null}
+        onClose={() => setConfirmRegenerate(null)}
+        onConfirm={handleRegenerate}
+        title="Regenerate Code"
+        description="A new code will be generated. The old code will stop working immediately."
+        confirmText="Regenerate"
+        variant="default"
+      />
     </div>
   );
 }

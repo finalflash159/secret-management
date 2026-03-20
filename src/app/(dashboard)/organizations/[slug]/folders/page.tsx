@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Modal } from '@/components/ui/modal';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { useToast } from '@/components/ui/toast';
 
 interface FolderData {
@@ -51,6 +52,7 @@ export default function FoldersPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingFolder, setEditingFolder] = useState<FolderData | null>(null);
+  const [confirmDeleteFolder, setConfirmDeleteFolder] = useState<FolderData | null>(null);
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -214,11 +216,11 @@ export default function FoldersPage() {
     }
   };
 
-  const handleDeleteFolder = async (folder: FolderData) => {
-    if (!confirm(`Are you sure you want to delete "${folder.name}"?`)) return;
+  const handleDeleteFolder = async () => {
+    if (!confirmDeleteFolder) return;
 
     try {
-      const res = await fetch(`/api/folders/${folder.id}`, {
+      const res = await fetch(`/api/folders/${confirmDeleteFolder.id}`, {
         method: 'DELETE',
       });
 
@@ -231,6 +233,8 @@ export default function FoldersPage() {
       }
     } catch {
       addToast({ title: 'An error occurred', variant: 'error' });
+    } finally {
+      setConfirmDeleteFolder(null);
     }
   };
 
@@ -310,7 +314,7 @@ export default function FoldersPage() {
               variant="ghost"
               size="sm"
               className="h-7 w-7 p-0 text-muted-foreground hover:text-danger"
-              onClick={() => handleDeleteFolder(folder)}
+              onClick={() => setConfirmDeleteFolder(folder)}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -486,6 +490,16 @@ export default function FoldersPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal
+        isOpen={!!confirmDeleteFolder}
+        onClose={() => setConfirmDeleteFolder(null)}
+        onConfirm={handleDeleteFolder}
+        title={`Delete "${confirmDeleteFolder?.name}"?`}
+        description="This action cannot be undone. All secrets inside this folder will also be deleted."
+        confirmText="Delete"
+        variant="danger"
+      />
     </div>
   );
 }

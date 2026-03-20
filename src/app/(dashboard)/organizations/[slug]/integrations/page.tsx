@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Modal } from '@/components/ui/modal';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { useToast } from '@/components/ui/toast';
 import { integrationTypes } from '@/config/integrations';
 
@@ -47,6 +48,7 @@ export default function IntegrationsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedType, setSelectedType] = useState<string>('');
   const [saving, setSaving] = useState(false);
+  const [confirmDisconnect, setConfirmDisconnect] = useState<Integration | null>(null);
 
   // Form state
   const [integrationName, setIntegrationName] = useState('');
@@ -138,11 +140,11 @@ export default function IntegrationsPage() {
     }
   };
 
-  const handleDeleteIntegration = async (integration: Integration) => {
-    if (!confirm(`Are you sure you want to disconnect "${integration.name}"?`)) return;
+  const handleDeleteIntegration = async () => {
+    if (!confirmDisconnect) return;
 
     try {
-      const res = await fetch(`/api/organizations/${slug}/integrations/${integration.id}`, {
+      const res = await fetch(`/api/organizations/${slug}/integrations/${confirmDisconnect.id}`, {
         method: 'DELETE',
       });
 
@@ -155,6 +157,8 @@ export default function IntegrationsPage() {
       }
     } catch {
       addToast({ title: 'An error occurred', variant: 'error' });
+    } finally {
+      setConfirmDisconnect(null);
     }
   };
 
@@ -262,7 +266,7 @@ export default function IntegrationsPage() {
                         variant="ghost"
                         size="sm"
                         className="h-9 w-9 p-0 text-muted-foreground hover:text-danger"
-                        onClick={() => handleDeleteIntegration(integration)}
+                        onClick={() => setConfirmDisconnect(integration)}
                       >
                         <Trash2 className="h-5 w-5" />
                       </Button>
@@ -390,6 +394,16 @@ export default function IntegrationsPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal
+        isOpen={!!confirmDisconnect}
+        onClose={() => setConfirmDisconnect(null)}
+        onConfirm={handleDeleteIntegration}
+        title={`Disconnect "${confirmDisconnect?.name}"?`}
+        description="The integration will be removed and any synced data will be lost."
+        confirmText="Disconnect"
+        variant="danger"
+      />
     </div>
   );
 }

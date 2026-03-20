@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Modal } from '@/components/ui/modal';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { useToast } from '@/components/ui/toast';
 
 interface Environment {
@@ -93,6 +94,9 @@ export default function DynamicSecretsPage() {
   const [showRotationModal, setShowRotationModal] = useState(false);
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Confirm modals
+  const [confirmDeleteSecret, setConfirmDeleteSecret] = useState<DynamicSecret | null>(null);
+  const [confirmDeleteJob, setConfirmDeleteJob] = useState<RotationJob | null>(null);
   const [viewingSecret, setViewingSecret] = useState<DynamicSecret | null>(null);
   const [credentials, setCredentials] = useState<Credential | null>(null);
   const [loadingCredentials, setLoadingCredentials] = useState(false);
@@ -283,12 +287,14 @@ export default function DynamicSecretsPage() {
     }
   };
 
-  const handleDeleteSecret = async (secret: DynamicSecret) => {
-    if (!confirm(`Are you sure you want to delete "${secret.name}"?`)) return;
+  const handleDeleteSecret = async () => {
+    const item = confirmDeleteSecret;
+    if (!item) return;
+    const name = item.name;
     if (!selectedProject) return;
 
     try {
-      const res = await fetch(`/api/projects/${selectedProject}/dynamic-secrets/${secret.id}`, {
+      const res = await fetch(`/api/projects/${selectedProject}/dynamic-secrets/${item.id}`, {
         method: 'DELETE',
       });
 
@@ -301,6 +307,8 @@ export default function DynamicSecretsPage() {
       }
     } catch {
       addToast({ title: 'An error occurred', variant: 'error' });
+    } finally {
+      setConfirmDeleteSecret(null);
     }
   };
 
@@ -465,12 +473,14 @@ export default function DynamicSecretsPage() {
     }
   };
 
-  const handleDeleteJob = async (job: RotationJob) => {
-    if (!confirm(`Are you sure you want to delete "${job.name}"?`)) return;
+  const handleDeleteJob = async () => {
+    const item = confirmDeleteJob;
+    if (!item) return;
+    const name = item.name;
     if (!selectedProject) return;
 
     try {
-      const res = await fetch(`/api/projects/${selectedProject}/rotation-jobs/${job.id}`, {
+      const res = await fetch(`/api/projects/${selectedProject}/rotation-jobs/${item.id}`, {
         method: 'DELETE',
       });
 
@@ -483,6 +493,8 @@ export default function DynamicSecretsPage() {
       }
     } catch {
       addToast({ title: 'An error occurred', variant: 'error' });
+    } finally {
+      setConfirmDeleteJob(null);
     }
   };
 
@@ -682,7 +694,7 @@ export default function DynamicSecretsPage() {
                           variant="ghost"
                           size="sm"
                           className="h-8 w-8 p-0 text-muted-foreground hover:text-danger"
-                          onClick={() => handleDeleteSecret(secret)}
+                          onClick={() => setConfirmDeleteSecret(secret)}
                           title="Delete"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -782,7 +794,7 @@ export default function DynamicSecretsPage() {
                           variant="ghost"
                           size="sm"
                           className="h-8 w-8 p-0 text-muted-foreground hover:text-danger"
-                          onClick={() => handleDeleteJob(job)}
+                          onClick={() => setConfirmDeleteJob(job)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -1073,6 +1085,26 @@ export default function DynamicSecretsPage() {
           </div>
         )}
       </Modal>
+
+      {/* Confirm Modals */}
+      <ConfirmModal
+        isOpen={confirmDeleteSecret !== null}
+        onClose={() => setConfirmDeleteSecret(null)}
+        onConfirm={handleDeleteSecret}
+        title="Delete Dynamic Secret"
+        description={confirmDeleteSecret ? `"${confirmDeleteSecret.name}" and all its credentials will be permanently deleted.` : ''}
+        confirmText="Delete"
+        variant="danger"
+      />
+      <ConfirmModal
+        isOpen={confirmDeleteJob !== null}
+        onClose={() => setConfirmDeleteJob(null)}
+        onConfirm={handleDeleteJob}
+        title="Delete Rotation Job"
+        description={confirmDeleteJob ? `"${confirmDeleteJob.name}" will be permanently deleted.` : ''}
+        confirmText="Delete"
+        variant="danger"
+      />
     </div>
   );
 }

@@ -49,9 +49,9 @@ export async function DELETE(
     }
 
     // Check delete access
-    await requireProjectAccess(existingSecret.projectId, 'secret:delete');
+    const { user } = await requireProjectAccess(existingSecret.projectId, 'secret:delete');
 
-    await secretService.delete(id, existingSecret.projectId);
+    await secretService.delete(id, user.id);
 
     return success({ success: true });
   } catch (err) {

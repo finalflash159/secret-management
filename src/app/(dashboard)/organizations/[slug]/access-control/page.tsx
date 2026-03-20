@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Modal } from '@/components/ui/modal';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { useToast } from '@/components/ui/toast';
 
 interface Role {
@@ -57,6 +58,7 @@ export default function AccessControlPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [saving, setSaving] = useState(false);
+  const [confirmDeleteRole, setConfirmDeleteRole] = useState<Role | null>(null);
 
   // Form state
   const [roleName, setRoleName] = useState('');
@@ -228,12 +230,11 @@ export default function AccessControlPage() {
     }
   };
 
-  const handleDeleteRole = async (role: Role) => {
-    if (!confirm(`Are you sure you want to delete "${role.name}"?`)) return;
-    if (!selectedProject) return;
+  const handleDeleteRole = async () => {
+    if (!confirmDeleteRole || !selectedProject) return;
 
     try {
-      const res = await fetch(`/api/projects/${selectedProject}/roles/${role.id}`, {
+      const res = await fetch(`/api/projects/${selectedProject}/roles/${confirmDeleteRole.id}`, {
         method: 'DELETE',
       });
 
@@ -246,6 +247,8 @@ export default function AccessControlPage() {
       }
     } catch {
       addToast({ title: 'An error occurred', variant: 'error' });
+    } finally {
+      setConfirmDeleteRole(null);
     }
   };
 
@@ -397,7 +400,7 @@ export default function AccessControlPage() {
                             variant="ghost"
                             size="sm"
                             className="h-8 w-8 p-0 text-muted-foreground hover:text-danger"
-                            onClick={() => handleDeleteRole(role)}
+                            onClick={() => setConfirmDeleteRole(role)}
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -547,6 +550,16 @@ export default function AccessControlPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal
+        isOpen={!!confirmDeleteRole}
+        onClose={() => setConfirmDeleteRole(null)}
+        onConfirm={handleDeleteRole}
+        title={`Delete "${confirmDeleteRole?.name}"?`}
+        description="Members with this role will lose their assigned permissions."
+        confirmText="Delete"
+        variant="danger"
+      />
     </div>
   );
 }
