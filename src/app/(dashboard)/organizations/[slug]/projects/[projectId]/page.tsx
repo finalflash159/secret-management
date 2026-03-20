@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -82,7 +82,7 @@ export default function ProjectSecretsPage() {
   const [envSlug, setEnvSlug] = useState('');
   const [teamMembers, setTeamMembers] = useState<{id: string; user: {id: string; email: string; name: string | null}; role: {name: string; slug: string}}[]>([]);
   const [memberEmail, setMemberEmail] = useState('');
-  const [memberRole, setMemberRole] = useState('viewer');
+  const [memberRole, setMemberRole] = useState('developer');
   const [editingSecret, setEditingSecret] = useState<Secret | null>(null);
   const [selectedSecret, setSelectedSecret] = useState<Secret | null>(null);
   const [visibleSecrets, setVisibleSecrets] = useState<Set<string>>(new Set());
@@ -100,6 +100,9 @@ export default function ProjectSecretsPage() {
   const [integrations] = useState<{id: string; name: string; connected: boolean}[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditEntry[]>([]);
   const [projectName, setProjectName] = useState('');
+  const [projectOwnerId, setProjectOwnerId] = useState('');
+  const [projectMembers, setProjectMembers] = useState<{userId: string; role: {permissions: unknown[]}}[]>([]);
+  const [currentUserId, setCurrentUserId] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -177,16 +180,24 @@ export default function ProjectSecretsPage() {
 
   const fetchProjectData = async () => {
     try {
-      const [projectRes, envsRes, foldersRes] = await Promise.all([
+      const [projectRes, envsRes, foldersRes, sessionRes] = await Promise.all([
         fetch(`/api/projects/${projectId}`),
         fetch(`/api/projects/${projectId}/environments`),
         fetch(`/api/projects/${projectId}/folders`),
+        fetch('/api/auth/session'),
       ]);
 
       if (projectRes.ok) {
         const projectJson = await projectRes.json();
         const project = projectJson.data || projectJson;
         setProjectName(project.name);
+        setProjectOwnerId(project.ownerId);
+        setProjectMembers(project.members || []);
+      }
+
+      if (sessionRes.ok) {
+        const sessionJson = await sessionRes.json();
+        setCurrentUserId(sessionJson?.user?.id || '');
       }
 
       if (envsRes.ok) {
@@ -539,6 +550,19 @@ export default function ProjectSecretsPage() {
   const filteredSecrets = secrets.filter(s => s.envId === activeEnv && s.key.toLowerCase().includes(searchQuery.toLowerCase()));
   const activeEnvData = environments.find(e => e.id === activeEnv);
 
+  // Compute user permissions from project membership
+  const userPermissions = useMemo(() => {
+    const member = projectMembers.find(m => m.userId === currentUserId);
+    return (member?.role?.permissions as string[] | undefined) ?? [];
+  }, [projectMembers, currentUserId]);
+
+  const isProjectOwner = projectOwnerId === currentUserId;
+  const canWrite = userPermissions.includes('secret:write');
+  const canDelete = userPermissions.includes('secret:delete');
+  const canManageMembers = userPermissions.includes('member:manage');
+  const canManageSettings = userPermissions.includes('settings:manage');
+  const canRotate = canWrite; // rotating regenerates value = write operation
+
   // Mock audit data for selected secret
   if (loading) {
     return (
@@ -572,14 +596,18 @@ export default function ProjectSecretsPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setShowSettingsModal(true)}>
-              <Settings className="h-4 w-4 mr-1" />
-              Settings
-            </Button>
-            <Button size="sm" onClick={() => { setEditingSecret(null); setSecretKey(''); setSecretValue(''); setSecretExpiresAt(''); setShowSecretModal(true); }}>
-              <Plus className="h-4 w-4 mr-1" />
-              Add Secret
-            </Button>
+            {(canManageSettings || isProjectOwner) && (
+              <Button variant="ghost" size="sm" onClick={() => setShowSettingsModal(true)}>
+                <Settings className="h-4 w-4 mr-1" />
+                Settings
+              </Button>
+            )}
+            {canWrite && (
+              <Button size="sm" onClick={() => { setEditingSecret(null); setSecretKey(''); setSecretValue(''); setSecretExpiresAt(''); setShowSecretModal(true); }}>
+                <Plus className="h-4 w-4 mr-1" />
+                Add Secret
+              </Button>
+            )}
           </div>
         </div>
 
@@ -683,10 +711,12 @@ export default function ProjectSecretsPage() {
               </div>
               <h3 className="text-sm font-semibold text-foreground">No secrets</h3>
               <p className="mt-1 text-xs text-muted-foreground">Add your first secret</p>
-              <Button size="sm" className="mt-4" onClick={() => { setEditingSecret(null); setShowSecretModal(true); }}>
-                <Plus className="h-4 w-4 mr-1" />
-                Add Secret
-              </Button>
+              {canWrite && (
+                <Button size="sm" className="mt-4" onClick={() => { setEditingSecret(null); setShowSecretModal(true); }}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Secret
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (
@@ -792,40 +822,48 @@ export default function ProjectSecretsPage() {
 
                   {/* Actions */}
                   <div className="flex items-center justify-end gap-1 shrink-0">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleRotateSecret(secret.id); }}
-                      className="p-1.5 rounded hover:bg-muted"
-                      title="Rotate secret"
-                    >
-                      <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); openEditModal(secret); }}
-                      className="p-1.5 rounded hover:bg-muted/80"
-                    >
-                      <Pencil className="h-4 w-4 text-foreground" />
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDeleteSecret(secret.id); }}
-                      className="p-1.5 rounded hover:bg-danger/20"
-                    >
-                      <Trash2 className="h-4 w-4 text-danger" />
-                    </button>
+                    {canRotate && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleRotateSecret(secret.id); }}
+                        className="p-1.5 rounded hover:bg-muted"
+                        title="Rotate secret"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />
+                      </button>
+                    )}
+                    {canWrite && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openEditModal(secret); }}
+                        className="p-1.5 rounded hover:bg-muted/80"
+                      >
+                        <Pencil className="h-4 w-4 text-foreground" />
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteSecret(secret.id); }}
+                        className="p-1.5 rounded hover:bg-danger/20"
+                      >
+                        <Trash2 className="h-4 w-4 text-danger" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Add Row */}
-            <div
-              className="flex items-center gap-2 px-4 py-2.5 border-t border-dashed border-border cursor-pointer hover:bg-muted/50 transition-colors"
-              onClick={() => { setEditingSecret(null); setSecretKey(''); setSecretValue(''); setShowSecretModal(true); }}
-            >
-              <div className="w-5 h-5 rounded border border-dashed border-border flex items-center justify-center text-muted-foreground">
-                <Plus className="h-3 w-3" />
+            {/* Add Row — only visible to users with write permission */}
+            {canWrite && (
+              <div
+                className="flex items-center gap-2 px-4 py-2.5 border-t border-dashed border-border cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => { setEditingSecret(null); setSecretKey(''); setSecretValue(''); setShowSecretModal(true); }}
+              >
+                <div className="w-5 h-5 rounded border border-dashed border-border flex items-center justify-center text-muted-foreground">
+                  <Plus className="h-3 w-3" />
+                </div>
+                <span className="text-xs text-muted-foreground">Add new secret...</span>
               </div>
-              <span className="text-xs text-muted-foreground">Add new secret...</span>
-            </div>
+            )}
           </Card>
         )}
       </div>
@@ -958,22 +996,28 @@ export default function ProjectSecretsPage() {
 
           {/* Panel Footer */}
           <div className="p-4 border-t border-border flex gap-2">
-            <Button variant="outline" size="sm" className="flex-1 justify-center" onClick={() => openEditModal(selectedSecret)}>
-              <Pencil className="h-4 w-4 mr-1" />
-              Edit
-            </Button>
-            <Button variant="gold" size="sm" className="flex-1 justify-center">
-              <RefreshCwIcon className="h-4 w-4 mr-1" />
-              Rotate
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-danger hover:bg-danger/10"
-              onClick={() => handleDeleteSecret(selectedSecret.id)}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            {canWrite && (
+              <Button variant="outline" size="sm" className="flex-1 justify-center" onClick={() => openEditModal(selectedSecret)}>
+                <Pencil className="h-4 w-4 mr-1" />
+                Edit
+              </Button>
+            )}
+            {canRotate && (
+              <Button variant="gold" size="sm" className="flex-1 justify-center" onClick={() => handleRotateSecret(selectedSecret.id)}>
+                <RefreshCwIcon className="h-4 w-4 mr-1" />
+                Rotate
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-danger hover:bg-danger/10"
+                onClick={() => handleDeleteSecret(selectedSecret.id)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -1140,44 +1184,48 @@ export default function ProjectSecretsPage() {
             </div>
           </div>
 
-          <div className="border-t border-border pt-2">
-            <div
-              className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-muted cursor-pointer"
-              onClick={openTeamModal}
-            >
-              <div>
-                <p className="text-sm font-medium text-foreground">Team</p>
-                <p className="text-xs text-muted-foreground">Manage members</p>
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </div>
-          </div>
-
-          {/* Danger Zone */}
-          <div className="border-t border-border pt-4 mt-4">
-            <h3 className="text-sm font-semibold text-danger mb-3 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4" />
-              Danger Zone
-            </h3>
-            <div className="rounded-lg border border-danger/20 bg-danger/5 p-3">
-              <div className="flex items-center justify-between">
+          {(canManageMembers || isProjectOwner) && (
+            <div className="border-t border-border pt-2">
+              <div
+                className="flex items-center justify-between py-2 px-2 rounded-lg hover:bg-muted cursor-pointer"
+                onClick={openTeamModal}
+              >
                 <div>
-                  <p className="text-sm font-medium text-foreground">Delete Project</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Once deleted, all secrets will be permanently lost.
-                  </p>
+                  <p className="text-sm font-medium text-foreground">Team</p>
+                  <p className="text-xs text-muted-foreground">Manage members</p>
                 </div>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => setShowDeleteModal(true)}
-                >
-                  <Trash2 className="h-4 w-4 mr-1.5" />
-                  Delete
-                </Button>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </div>
             </div>
-          </div>
+          )}
+
+          {/* Danger Zone — only owner sees it */}
+          {isProjectOwner && (
+            <div className="border-t border-border pt-4 mt-4">
+              <h3 className="text-sm font-semibold text-danger mb-3 flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Danger Zone
+              </h3>
+              <div className="rounded-lg border border-danger/20 bg-danger/5 p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Delete Project</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Once deleted, all secrets will be permanently lost.
+                    </p>
+                  </div>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => setShowDeleteModal(true)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-1.5" />
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
 
@@ -1200,7 +1248,7 @@ export default function ProjectSecretsPage() {
               className="h-8 rounded-md border border-border bg-background px-2 text-sm"
             >
               <option value="admin">Admin</option>
-              <option value="editor">Editor</option>
+              <option value="developer">Developer</option>
               <option value="viewer">Viewer</option>
             </select>
             <Button type="submit" disabled={creating} size="sm">Add</Button>
@@ -1218,7 +1266,7 @@ export default function ProjectSecretsPage() {
                     className="text-xs mt-1 rounded border border-border bg-background px-2 py-1"
                   >
                     <option value="admin">Admin</option>
-                    <option value="editor">Editor</option>
+                    <option value="developer">Developer</option>
                     <option value="viewer">Viewer</option>
                   </select>
                 </div>

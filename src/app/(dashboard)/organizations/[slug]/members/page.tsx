@@ -26,6 +26,7 @@ export default function MembersPage() {
   const slug = params.slug as string;
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userOrgRole, setUserOrgRole] = useState<string | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteType, setInviteType] = useState<'email' | 'code'>('email');
   const [inviting, setInviting] = useState(false);
@@ -40,10 +41,21 @@ export default function MembersPage() {
 
   const fetchMembers = useCallback(async () => {
     try {
-      const res = await fetch(`/api/organizations/${slug}/members`);
-      if (res.ok) {
-        const json = await res.json();
-        setMembers(json?.data ?? json);
+      const [membersRes, sessionRes] = await Promise.all([
+        fetch(`/api/organizations/${slug}/members`),
+        fetch('/api/auth/session'),
+      ]);
+      if (membersRes.ok) {
+        const json = await membersRes.json();
+        const membersData = json?.data ?? json;
+        setMembers(membersData);
+        if (sessionRes.ok) {
+          const sessionJson = await sessionRes.json();
+          const myMembership = membersData?.find(
+            (m: Member) => m.userId === sessionJson?.user?.id
+          );
+          setUserOrgRole(myMembership?.role ?? null);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch members:', err);
@@ -179,6 +191,21 @@ export default function MembersPage() {
     );
   }
 
+  // Non-admin/member users cannot access members management
+  if (!userOrgRole || userOrgRole === 'member') {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="h-12 w-12 rounded-full bg-danger/10 flex items-center justify-center mb-4">
+          <Users className="h-6 w-6 text-danger" />
+        </div>
+        <h2 className="text-lg font-semibold text-foreground mb-1">Access Restricted</h2>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          You need admin or owner role to manage organization members.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -186,10 +213,12 @@ export default function MembersPage() {
           <h1 className="text-xl font-bold text-foreground">Members</h1>
           <p className="text-sm text-muted-foreground">Manage team members and their access</p>
         </div>
-        <Button onClick={() => setShowInviteModal(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Invite Member
-        </Button>
+        {(userOrgRole === 'owner' || userOrgRole === 'admin') && (
+          <Button onClick={() => setShowInviteModal(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Invite Member
+          </Button>
+        )}
       </div>
 
       <Card className="bg-card border-border">

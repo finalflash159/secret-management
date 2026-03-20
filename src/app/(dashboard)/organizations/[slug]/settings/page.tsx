@@ -23,6 +23,7 @@ export default function SettingsPage() {
 
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userOrgRole, setUserOrgRole] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState('');
   const [success, setSuccess] = useState(false);
@@ -57,6 +58,15 @@ export default function SettingsPage() {
         const data = json?.data ?? json;
         setOrganization(data);
         setName(data.name);
+        // Extract user's org role from members array
+        const sessionRes = await fetch('/api/auth/session');
+        if (sessionRes.ok) {
+          const sessionJson = await sessionRes.json();
+          const myMembership = data?.members?.find(
+            (m: { userId: string }) => m.userId === sessionJson?.user?.id
+          );
+          setUserOrgRole(myMembership?.role ?? null);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch organization:', err);
@@ -106,6 +116,23 @@ export default function SettingsPage() {
       </div>
     );
   }
+
+  // Non-admin/member users cannot access org settings
+  if (!userOrgRole || userOrgRole === 'member') {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="h-12 w-12 rounded-full bg-danger/10 flex items-center justify-center mb-4">
+          <Settings className="h-6 w-6 text-danger" />
+        </div>
+        <h2 className="text-lg font-semibold text-foreground mb-1">Access Restricted</h2>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          You need admin or owner role to manage organization settings.
+        </p>
+      </div>
+    );
+  }
+
+  const canManageOrg = userOrgRole === 'owner' || userOrgRole === 'admin';
 
   return (
     <div className="space-y-6">
@@ -190,12 +217,13 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Danger Zone */}
-      <div className="mt-8 pt-6 border-t border-border">
-        <h2 className="text-sm font-semibold text-danger mb-4 flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4" />
-          Danger Zone
-        </h2>
+      {/* Danger Zone — only owner can delete */}
+      {canManageOrg && userOrgRole === 'owner' && (
+        <div className="mt-8 pt-6 border-t border-border">
+          <h2 className="text-sm font-semibold text-danger mb-4 flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            Danger Zone
+          </h2>
         <Card className="bg-card border-danger/20">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -216,7 +244,8 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       <Modal

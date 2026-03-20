@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { NextRequest } from 'next/server';
+import { requireProjectAccess } from '@/backend/middleware/auth';
+import { success, error } from '@/backend/utils/api-response';
 import { db } from '@/lib/db';
-import { hasPermission } from '@/backend/middleware/permissions';
 import { z } from 'zod';
 
 const createRoleSchema = z.object({
@@ -18,20 +18,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
     const { id } = await params;
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const hasAccess = await hasPermission(session.user.id, id, 'secret:read');
-    const project = await db.project.findUnique({ where: { id } });
-    const isOwner = project?.ownerId === session.user.id;
-
-    if (!hasAccess && !isOwner) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-    }
+    // Viewing roles requires settings:manage (sensitive info)
+    await requireProjectAccess(id, 'settings:manage');
 
     const roles = await db.role.findMany({
       where: { projectId: id },
@@ -43,10 +32,12 @@ export async function GET(
       orderBy: { slug: 'asc' },
     });
 
-    return NextResponse.json(roles);
-  } catch (error) {
-    console.error('Get roles error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return success(roles);
+  } catch (err) {
+    console.error('Get roles error:', err);
+    const response = handleAuthError(err);
+    if (response) return response;
+    return error('Internal server error', 500);
   }
 }
 
@@ -55,20 +46,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
     const { id: projectId } = await params;
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const project = await db.project.findUnique({ where: { id: projectId } });
-    const isOwner = project?.ownerId === session.user.id;
-    const hasAccess = await hasPermission(session.user.id, projectId, 'member:manage');
-
-    if (!hasAccess && !isOwner) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-    }
+    await requireProjectAccess(projectId, 'member:manage');
 
     const body = await req.json();
     const data = createRoleSchema.parse(body);
@@ -79,7 +58,7 @@ export async function POST(
     });
 
     if (existing) {
-      return NextResponse.json({ error: 'Role with this slug already exists' }, { status: 400 });
+      return error('Role with this slug already exists', 400);
     }
 
     // If setting as default, unset other defaults
@@ -100,12 +79,29 @@ export async function POST(
       },
     });
 
-    return NextResponse.json(role, { status: 201 });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues[0].message }, { status: 400 });
+    return success(role, 201);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return error(err.issues[0].message, 400);
     }
-    console.error('Create role error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Create role error:', err);
+    const response = handleAuthError(err);
+    if (response) return response;
+    return error('Internal server error', 500);
   }
+}
+
+/**
+ * Helper to handle auth errors
+ */
+function handleAuthError(err: unknown) {
+  if (err instanceof Error) {
+    if (err.message === 'Unauthorized') {
+      return error('Unauthorized', 401);
+    }
+    if (err.message === 'Access denied' || err.message === 'Insufficient permissions') {
+      return error(err.message, 403);
+    }
+  }
+  return null;
 }

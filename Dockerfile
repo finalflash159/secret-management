@@ -27,8 +27,8 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 # [FIX]: Force Prisma to use binary engine for Alpine compatibility
-ENV PRISMA_CLI_QUERY_ENGINE_TYPE="binary"
-ENV PRISMA_CLIENT_ENGINE_TYPE="binary"
+ENV PRISMA_CLI_QUERY_ENGINE_TYPE="linary"
+ENV PRISMA_CLIENT_ENGINE_TYPE="linary"
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs

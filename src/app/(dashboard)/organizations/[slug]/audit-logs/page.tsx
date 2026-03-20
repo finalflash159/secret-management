@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { FileText, Filter, RefreshCw } from 'lucide-react';
+import { FileText, Filter, RefreshCw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -27,15 +27,31 @@ export default function AuditLogsPage() {
 
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userOrgRole, setUserOrgRole] = useState<string | null>(null);
   const [filter, setFilter] = useState('all');
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     setLoading(true);
     try {
-      // For now, we'll get logs from all projects in the org
-      const res = await fetch(`/api/projects?orgSlug=${slug}`);
-      if (res.ok) {
-        const projects = await res.json();
+      const [orgRes, projectsRes, sessionRes] = await Promise.all([
+        fetch(`/api/organizations/${slug}`),
+        fetch(`/api/projects?orgSlug=${slug}`),
+        fetch('/api/auth/session'),
+      ]);
+
+      // Set user's org role
+      if (orgRes.ok && sessionRes.ok) {
+        const orgJson = await orgRes.json();
+        const orgData = orgJson?.data ?? orgJson;
+        const sessionJson = await sessionRes.json();
+        const myMembership = orgData?.members?.find(
+          (m: { userId: string }) => m.userId === sessionJson?.user?.id
+        );
+        setUserOrgRole(myMembership?.role ?? null);
+      }
+
+      if (projectsRes.ok) {
+        const projects = await projectsRes.json();
 
         // Fetch audit logs for each project
         const allLogs: AuditLog[] = [];
@@ -59,12 +75,11 @@ export default function AuditLogsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [slug]);
 
   useEffect(() => {
     fetchLogs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug]);
+  }, [fetchLogs]);
 
   const getActionColor = (action: string) => {
     switch (action) {
@@ -82,6 +97,29 @@ export default function AuditLogsPage() {
   const filteredLogs = filter === 'all'
     ? logs
     : logs.filter(log => log.targetType === filter);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Non-admin/member users cannot access audit logs
+  if (!userOrgRole || userOrgRole === 'member') {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="h-12 w-12 rounded-full bg-danger/10 flex items-center justify-center mb-4">
+          <FileText className="h-6 w-6 text-danger" />
+        </div>
+        <h2 className="text-lg font-semibold text-foreground mb-1">Access Restricted</h2>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          You need admin or owner role to view audit logs.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

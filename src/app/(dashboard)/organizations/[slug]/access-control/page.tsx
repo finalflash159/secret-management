@@ -38,7 +38,7 @@ const allPermissions = [
   { name: 'project:delete', description: 'Delete the project' },
 ];
 
-const systemRoles = ['admin', 'editor', 'viewer'];
+const systemRoles = ['admin', 'developer', 'viewer'];
 
 export default function AccessControlPage() {
   const params = useParams();
@@ -47,6 +47,7 @@ export default function AccessControlPage() {
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userOrgRole, setUserOrgRole] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [roles, setRoles] = useState<Role[]>([]);
   const [rolesLoading, setRolesLoading] = useState(false);
@@ -65,13 +66,24 @@ export default function AccessControlPage() {
 
   const fetchProjects = useCallback(async () => {
     try {
-      const res = await fetch(`/api/organizations/${slug}`);
-      if (res.ok) {
-        const json = await res.json();
+      const [orgRes, sessionRes] = await Promise.all([
+        fetch(`/api/organizations/${slug}`),
+        fetch('/api/auth/session'),
+      ]);
+      if (orgRes.ok) {
+        const json = await orgRes.json();
         const data = json?.data ?? json;
         setProjects(data.projects || []);
         if (data.projects?.length > 0) {
           setSelectedProject(data.projects[0].id);
+        }
+        // Set user's org role
+        if (sessionRes.ok) {
+          const sessionJson = await sessionRes.json();
+          const myMembership = data?.members?.find(
+            (m: { userId: string }) => m.userId === sessionJson?.user?.id
+          );
+          setUserOrgRole(myMembership?.role ?? null);
         }
       }
     } catch (err) {
@@ -241,6 +253,21 @@ export default function AccessControlPage() {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Non-admin/member users cannot access access control
+  if (!userOrgRole || userOrgRole === 'member') {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="h-12 w-12 rounded-full bg-danger/10 flex items-center justify-center mb-4">
+          <Shield className="h-6 w-6 text-danger" />
+        </div>
+        <h2 className="text-lg font-semibold text-foreground mb-1">Access Restricted</h2>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          You need admin or owner role to manage access control.
+        </p>
       </div>
     );
   }

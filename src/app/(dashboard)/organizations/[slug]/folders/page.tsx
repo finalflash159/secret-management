@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { Plus, Folder, Pencil, Trash2, ChevronRight, ChevronDown, Loader2 } from 'lucide-react';
+import { Plus, Folder, Pencil, Trash2, ChevronRight, ChevronDown, Loader2, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -42,6 +42,7 @@ export default function FoldersPage() {
   const [environments, setEnvironments] = useState<Environment[]>([]);
   const [folders, setFolders] = useState<FolderData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userOrgRole, setUserOrgRole] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [selectedEnv, setSelectedEnv] = useState<string>('');
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -59,13 +60,28 @@ export default function FoldersPage() {
 
   const fetchProjects = useCallback(async () => {
     try {
-      const res = await fetch(`/api/organizations/${slug}`);
-      if (res.ok) {
-        const json = await res.json();
+      const [orgRes, sessionRes] = await Promise.all([
+        fetch(`/api/organizations/${slug}`),
+        fetch('/api/auth/session'),
+      ]);
+      if (orgRes.ok) {
+        const json = await orgRes.json();
         const data = json?.data ?? json;
         setProjects(data.projects || []);
         if (data.projects?.length > 0) {
           setSelectedProject(data.projects[0].id);
+        }
+      }
+      if (sessionRes.ok) {
+        const sessionJson = await sessionRes.json();
+        const userId = sessionJson?.user?.id;
+        if (userId && orgRes.ok) {
+          const json = await orgRes.json();
+          const data = json?.data ?? json;
+          const myMembership = data?.members?.find(
+            (m: { userId: string }) => m.userId === userId
+          );
+          setUserOrgRole(myMembership?.role ?? null);
         }
       }
     } catch (err) {
@@ -318,6 +334,20 @@ export default function FoldersPage() {
   };
 
   const flatFolders = flattenFolders(folderTree);
+
+  if (!userOrgRole || userOrgRole === 'member') {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="h-12 w-12 rounded-full bg-danger/10 flex items-center justify-center mb-4">
+          <Shield className="h-6 w-6 text-danger" />
+        </div>
+        <h2 className="text-lg font-semibold text-foreground mb-1">Access Restricted</h2>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          You need admin or owner role to manage folders.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

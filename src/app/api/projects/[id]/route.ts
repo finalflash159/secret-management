@@ -67,9 +67,9 @@ export async function DELETE(
       return notFound('Project not found');
     }
 
-    // Only owner can delete, unless they have project:delete permission
+    // Only owner or users with project:delete permission can delete
     if (!isOwner) {
-      return error('Only owner can delete project', 403);
+      return error('Only owner or users with project:delete permission can delete project', 403);
     }
 
     await projectService.delete(id, user.id);

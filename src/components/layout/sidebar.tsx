@@ -26,6 +26,7 @@ interface SidebarProps {
   user: UserData | null;
   collapsed?: boolean;
   organizationSlug?: string | null;
+  orgRole?: 'owner' | 'admin' | 'member' | null;
   unreadAlerts?: number;
 }
 
@@ -41,7 +42,7 @@ interface NavGroup {
   items: NavItem[];
 }
 
-function SidebarComponent({ user, collapsed = false, organizationSlug, unreadAlerts = 0 }: SidebarProps) {
+function SidebarComponent({ user, collapsed = false, organizationSlug, orgRole, unreadAlerts = 0 }: SidebarProps) {
   const pathname = usePathname();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loadingOrgs, setLoadingOrgs] = useState(false);
@@ -77,6 +78,8 @@ function SidebarComponent({ user, collapsed = false, organizationSlug, unreadAle
   // Build base href based on org slug
   const baseHref = organizationSlug ? `/organizations/${organizationSlug}` : '/organizations';
 
+  const isAdmin = orgRole === 'owner' || orgRole === 'admin';
+
   // Only show navigation when org is selected
   const navGroups = useMemo<NavGroup[]>(() => {
     if (!organizationSlug) return [];
@@ -108,8 +111,20 @@ function SidebarComponent({ user, collapsed = false, organizationSlug, unreadAle
           { label: 'Billing', href: `${baseHref}/billing`, icon: <CreditCard className="h-4 w-4" /> },
         ],
       },
-    ];
-  }, [baseHref, unreadAlerts, organizationSlug]);
+    ].map(group => ({
+      ...group,
+      // Hide Settings group for non-admin/member (shouldn't happen but safety check)
+      items: group.items.filter(item => {
+        // Non-members never see Settings group items
+        if (!orgRole) return false;
+        // All roles see Secrets, Folders, Alerts
+        if (['Secrets', 'Dynamic Secrets', 'Secret Rotation', 'Folders', 'Integrations', 'Audit Logs', 'Alerts'].includes(item.label)) return true;
+        // Only admin/owner see Settings, Members, Access Control
+        if (['Settings', 'Members', 'Access Control'].includes(item.label)) return isAdmin;
+        return true;
+      }),
+    })).filter(group => group.items.length > 0);
+  }, [baseHref, unreadAlerts, organizationSlug, orgRole, isAdmin]);
 
   const isActive = useCallback((href: string) => {
     return pathname === href;

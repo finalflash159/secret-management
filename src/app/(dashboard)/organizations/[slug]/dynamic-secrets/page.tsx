@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { Database, Server, Key, Plus, RotateCw, Trash2, Loader2, Clock, CheckCircle, XCircle, Play, Pause, Eye, Copy, Check } from 'lucide-react';
+import { Database, Server, Key, Plus, RotateCw, Trash2, Loader2, Clock, CheckCircle, XCircle, Play, Pause, Eye, Copy, Check, Shield } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -81,6 +81,7 @@ export default function DynamicSecretsPage() {
   const [dynamicSecrets, setDynamicSecrets] = useState<DynamicSecret[]>([]);
   const [rotationJobs, setRotationJobs] = useState<RotationJob[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userOrgRole, setUserOrgRole] = useState<string | null>(null);
   const [rotating, setRotating] = useState<string | null>(null);
 
   const [selectedProject, setSelectedProject] = useState<string>('');
@@ -115,14 +116,26 @@ export default function DynamicSecretsPage() {
 
   const fetchProjects = useCallback(async () => {
     try {
-      const res = await fetch(`/api/organizations/${slug}`);
-      if (res.ok) {
-        const json = await res.json();
+      const [orgRes, sessionRes] = await Promise.all([
+        fetch(`/api/organizations/${slug}`),
+        fetch('/api/auth/session'),
+      ]);
+      if (orgRes.ok) {
+        const json = await orgRes.json();
         const data = json?.data ?? json;
         setProjects(data.projects || []);
         if (data.projects?.length > 0) {
           setSelectedProject(data.projects[0].id);
         }
+      }
+      if (sessionRes.ok && orgRes.ok) {
+        const sessionJson = await sessionRes.json();
+        const json = await orgRes.json();
+        const data = json?.data ?? json;
+        const myMembership = data?.members?.find(
+          (m: { userId: string }) => m.userId === sessionJson?.user?.id
+        );
+        setUserOrgRole(myMembership?.role ?? null);
       }
     } catch (err) {
       console.error('Failed to fetch projects:', err);
@@ -493,6 +506,20 @@ export default function DynamicSecretsPage() {
     const option = cronOptions.find(c => c.value === cron);
     return option?.label || cron;
   };
+
+  if (!userOrgRole || userOrgRole === 'member') {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="h-12 w-12 rounded-full bg-danger/10 flex items-center justify-center mb-4">
+          <Shield className="h-6 w-6 text-danger" />
+        </div>
+        <h2 className="text-lg font-semibold text-foreground mb-1">Access Restricted</h2>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          You need admin or owner role to manage dynamic secrets.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

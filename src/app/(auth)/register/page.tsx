@@ -50,74 +50,79 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-[var(--background)] p-4">
       <div className="w-full max-w-sm">
         {/* Logo */}
-        <div className="flex items-center justify-center mb-6">
-          <Logo width={140} height={48} />
+        <div className="flex items-center justify-center mb-10">
+          <Logo width={180} height={64} />
         </div>
 
         <Card>
-          <CardHeader className="space-y-1 pb-3">
-            <CardTitle className="text-base">Create an account</CardTitle>
-            <CardDescription className="text-xs">
+          <CardHeader className="space-y-1 pb-4">
+            <CardTitle className="text-lg">Create an account</CardTitle>
+            <CardDescription className="text-sm">
               Enter your details and invitation code to register
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-3">
+            <form onSubmit={handleSubmit} className="space-y-4">
               {error && (
-                <div className="rounded-md bg-[var(--danger)]/10 p-2 text-xs text-[var(--danger)] border border-[var(--danger)]/20">
+                <div className="rounded-md bg-[var(--danger)]/10 p-3 text-sm text-[var(--danger)] border border-[var(--danger)]/20">
                   {error}
                 </div>
               )}
-              <div className="space-y-1.5">
-                <Label htmlFor="name">Name</Label>
+              <div className="space-y-2">
+                <Label htmlFor="name" className="text-sm font-medium">Name</Label>
                 <Input
                   id="name"
                   type="text"
-                  placeholder="John Doe"
+                  inputHeight="lg"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-medium">Email</Label>
                 <Input
                   id="email"
                   type="email"
+                  inputHeight="lg"
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="password">Password</Label>
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-sm font-medium">Password</Label>
                 <Input
                   id="password"
                   type="password"
+                  inputHeight="lg"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={8}
                 />
-                <p className="text-[10px] text-[var(--muted-foreground)]">Must be at least 8 characters</p>
+                <p className="text-xs text-[var(--muted-foreground)]">Must be at least 8 characters</p>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="inviteCode">Invitation Code</Label>
+              <div className="space-y-2">
+                <Label htmlFor="inviteCode" className="text-sm font-medium">Invitation Code</Label>
                 <Input
                   id="inviteCode"
                   type="text"
+                  inputHeight="lg"
                   value={inviteCode}
                   onChange={(e) => setInviteCode(e.target.value)}
                   placeholder="Enter invitation code"
                   required
                 />
-                <p className="text-[10px] text-[var(--muted-foreground)]">Contact your administrator for the invitation code</p>
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  This is a restricted installation. Contact your administrator for the invitation code.
+                </p>
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" className="w-full h-11 text-base" disabled={loading}>
                 {loading ? 'Creating account...' : 'Create account'}
               </Button>
             </form>
-            <div className="mt-3 text-center text-xs">
+            <div className="mt-4 text-center text-sm">
               Already have an account?{' '}
               <Link href="/login" className="text-[var(--primary)] hover:underline">
                 Sign in

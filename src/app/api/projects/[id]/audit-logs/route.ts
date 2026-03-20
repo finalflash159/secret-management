@@ -1,27 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { NextRequest } from 'next/server';
+import { requireProjectAccess } from '@/backend/middleware/auth';
+import { success, error } from '@/backend/utils/api-response';
 import { db } from '@/lib/db';
-import { hasPermission } from '@/backend/middleware/permissions';
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
     const { id } = await params;
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const hasAccess = await hasPermission(session.user.id, id, 'secret:read');
-    const project = await db.project.findUnique({ where: { id } });
-    const isOwner = project?.ownerId === session.user.id;
-
-    if (!hasAccess && !isOwner) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-    }
+    // Viewing audit logs requires settings:manage (sensitive operational data)
+    await requireProjectAccess(id, 'settings:manage');
 
     const { searchParams } = new URL(req.url);
     const limit = parseInt(searchParams.get('limit') || '50');
@@ -43,9 +32,26 @@ export async function GET(
       skip: offset,
     });
 
-    return NextResponse.json(logs);
-  } catch (error) {
-    console.error('Get audit logs error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return success(logs);
+  } catch (err) {
+    console.error('Get audit logs error:', err);
+    const response = handleAuthError(err);
+    if (response) return response;
+    return error('Internal server error', 500);
   }
+}
+
+/**
+ * Helper to handle auth errors
+ */
+function handleAuthError(err: unknown) {
+  if (err instanceof Error) {
+    if (err.message === 'Unauthorized') {
+      return error('Unauthorized', 401);
+    }
+    if (err.message === 'Access denied' || err.message === 'Insufficient permissions') {
+      return error(err.message, 403);
+    }
+  }
+  return null;
 }

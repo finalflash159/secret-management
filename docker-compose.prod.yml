@@ -7,8 +7,6 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: secret_manager
-    # [SECURITY FIX]: Removed ports "5432:5432" to prevent external botnet access.
-    # The Next.js app can still connect securely via the internal Docker network.
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -31,15 +29,15 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/secret_manager
       NODE_ENV: production
-      # [FIX]: Required environment variables to resolve Auth.js errors
-      AUTH_SECRET: "zane_secret_key_123"
+      NEXTAUTH_URL: https://app.g-ondo-r.dev
+      NEXTAUTH_SECRET: zane_secret_key_123
+      AUTH_SECRET: zane_secret_key_123
       AUTH_TRUST_HOST: "true"
       ALLOW_SELF_REGISTRATION: "false"
-      INVITE_CODES: finalflash159
-      PRISMA_CLI_QUERY_ENGINE_TYPE: binary
-      PRISMA_CLIENT_ENGINE_TYPE: binary
-    # [FIX]: Auto-sync DB on startup, bypassing Prisma 7 version mismatch error
-    command: sh -c "npx prisma@5.22.0 db push --schema=/app/node_modules/.prisma/client/schema.prisma && node server.js"
+      MASTER_SUPER_ADMIN_EMAIL: "admin@yourcompany.com"
+      MASTER_INVITE_CODE: "generate-a-strong-random-code-here"
+      MASTER_KEY: zane_master_encryption_key_2026 
+    command: sh -c "npx prisma@5.22.0 db push --schema=/app/node_modules/.prisma/client/schema.prisma --skip-generate && node server.js"
 
 volumes:
   postgres_data:

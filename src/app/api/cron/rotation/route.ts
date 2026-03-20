@@ -22,11 +22,16 @@ import { calculateNextRunTime } from '@/lib/cron-utils';
  */
 export async function POST(req: NextRequest) {
   try {
-    // Optional: Add a secret key for authentication
+    // Mandatory: require a secret key for authentication
     const authHeader = req.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    if (!cronSecret) {
+      console.error('CRON_SECRET environment variable is not set');
+      return error('Cron endpoint misconfigured — CRON_SECRET not set', 500);
+    }
+
+    if (authHeader !== `Bearer ${cronSecret}`) {
       return error('Unauthorized', 401);
     }
 

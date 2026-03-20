@@ -318,13 +318,15 @@ model OrgInvitation {
 // Track who used each invitation
 model InvitationUse {
   id            String        @id @default(cuid())
-  invitationId  String
-  invitation    OrgInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  invitationId  String?       // null for master invite codes (no DB invite record)
+  invitation    OrgInvitation? @relation(fields: [invitationId], references: [id], onDelete: Cascade)
   userId        String
   user          User          @relation(fields: [userId], references: [id])
+  usedByEmail   String?      // tracks master invite code usage (MASTER_INVITE_CODE)
   usedAt        DateTime      @default(now())
 
   @@unique([invitationId, userId])
+  @@unique([usedByEmail])
   @@index([invitationId])
 }
 

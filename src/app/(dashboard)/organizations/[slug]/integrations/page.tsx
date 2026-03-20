@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
-import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, CheckCircle, XCircle, Loader2, Shield } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +41,7 @@ export default function IntegrationsPage() {
 
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [testing, setTesting] = useState<string | null>(null);
+  const [userOrgRole, setUserOrgRole] = useState<string | null>(null);
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -53,10 +54,25 @@ export default function IntegrationsPage() {
 
   const fetchIntegrations = useCallback(async () => {
     try {
-      const res = await fetch(`/api/organizations/${slug}/integrations`);
-      if (res.ok) {
-        const json = await res.json();
+      const [integrationsRes, sessionRes] = await Promise.all([
+        fetch(`/api/organizations/${slug}/integrations`),
+        fetch('/api/auth/session'),
+      ]);
+      if (integrationsRes.ok) {
+        const json = await integrationsRes.json();
         setIntegrations(json?.data ?? json);
+      }
+      if (sessionRes.ok) {
+        const sessionJson = await sessionRes.json();
+        const orgRes = await fetch(`/api/organizations/${slug}`);
+        if (orgRes.ok) {
+          const json = await orgRes.json();
+          const data = json?.data ?? json;
+          const myMembership = data?.members?.find(
+            (m: { userId: string }) => m.userId === sessionJson?.user?.id
+          );
+          setUserOrgRole(myMembership?.role ?? null);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch integrations:', err);
@@ -168,6 +184,20 @@ export default function IntegrationsPage() {
   };
 
   const selectedTypeData = getIntegrationType(selectedType);
+
+  if (!userOrgRole || userOrgRole === 'member') {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="h-12 w-12 rounded-full bg-danger/10 flex items-center justify-center mb-4">
+          <Shield className="h-6 w-6 text-danger" />
+        </div>
+        <h2 className="text-lg font-semibold text-foreground mb-1">Access Restricted</h2>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          You need admin or owner role to manage integrations.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

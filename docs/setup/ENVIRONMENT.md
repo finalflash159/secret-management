@@ -42,15 +42,20 @@ This document describes all environment variables used in the Secret Manager app
 
 ---
 
-### Invite Codes
+### Registration
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ALLOW_SELF_REGISTRATION` | Allow open registration (disable for invite-only) | `false` |
 
+### Master Super Admin Mode
+
+When `MASTER_SUPER_ADMIN_EMAIL` is set, only that exact email can register. The `MASTER_INVITE_CODE` is single-use and tracked in the database. When this mode is active, `ALLOW_SELF_REGISTRATION` is ignored.
+
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `INVITE_CODES` | Comma-separated invite codes | `INVITE_CODE_1,INVITE_CODE_2` |
+| `MASTER_SUPER_ADMIN_EMAIL` | Only this email can register | `admin@yourcompany.com` |
+| `MASTER_INVITE_CODE` | One-time use master invite code | `K9xMn2pQ` |
 
 ---
 

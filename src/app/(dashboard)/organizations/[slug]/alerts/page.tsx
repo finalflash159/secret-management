@@ -167,6 +167,7 @@ export default function AlertsPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
+  const [userOrgRole, setUserOrgRole] = useState<string | null>(null);
   const [filters, setFilters] = useState<AlertFilters>({
     type: 'all',
     scope: 'all',
@@ -185,13 +186,30 @@ export default function AlertsPage() {
       if (filters.type !== 'all') params.set('type', filters.type);
       if (filters.read === 'read') params.set('read', 'true');
       else if (filters.read === 'unread') params.set('read', 'false');
+      if (filters.scope !== 'all') params.set('scope', filters.scope);
 
-      const res = await fetch(`/api/alerts?${params.toString()}`);
+      const [res, sessionRes] = await Promise.all([
+        fetch(`/api/alerts?${params.toString()}`),
+        fetch('/api/auth/session'),
+      ]);
       const json = await res.json();
 
       if (json?.data) {
         setAlerts(json.data.alerts || []);
         setTotal(json.data.total || 0);
+      }
+
+      if (sessionRes.ok) {
+        const sessionJson = await sessionRes.json();
+        const orgRes = await fetch(`/api/organizations/${slug}`);
+        if (orgRes.ok) {
+          const json = await orgRes.json();
+          const data = json?.data ?? json;
+          const myMembership = data?.members?.find(
+            (m: { userId: string }) => m.userId === sessionJson?.user?.id
+          );
+          setUserOrgRole(myMembership?.role ?? null);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch alerts:', err);
@@ -203,7 +221,7 @@ export default function AlertsPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters, page, addToast]);
+  }, [filters, page, slug, addToast]);
 
   useEffect(() => {
     fetchAlerts();
@@ -279,6 +297,20 @@ export default function AlertsPage() {
 
   const unreadCount = alerts.filter((a) => !a.read).length;
   const totalPages = Math.ceil(total / limit);
+
+  if (!userOrgRole || userOrgRole === 'member') {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="h-12 w-12 rounded-full bg-danger/10 flex items-center justify-center mb-4">
+          <Shield className="h-6 w-6 text-danger" />
+        </div>
+        <h2 className="text-lg font-semibold text-foreground mb-1">Access Restricted</h2>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          You need admin or owner role to manage alerts.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

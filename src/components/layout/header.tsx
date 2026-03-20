@@ -29,10 +29,11 @@ interface HeaderProps {
   user: UserData | null;
   sidebarCollapsed?: boolean;
   organizationSlug?: string | null;
+  orgRole?: 'owner' | 'admin' | 'member' | null;
   unreadAlerts?: number;
 }
 
-function HeaderComponent({ user, organizationSlug, unreadAlerts = 0 }: HeaderProps) {
+function HeaderComponent({ user, organizationSlug, orgRole, unreadAlerts = 0 }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { addToast } = useToast();
@@ -261,6 +262,19 @@ function HeaderComponent({ user, organizationSlug, unreadAlerts = 0 }: HeaderPro
                       {user?.name || 'User'}
                     </p>
                     <p className="text-xs text-muted-foreground">{user?.email}</p>
+                    {orgRole && (
+                      <span
+                        className={`mt-1 inline-block text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                          orgRole === 'owner'
+                            ? 'bg-yellow-500/10 text-yellow-500'
+                            : orgRole === 'admin'
+                            ? 'bg-blue-500/10 text-blue-500'
+                            : 'bg-muted text-muted-foreground'
+                        }`}
+                      >
+                        {orgRole}
+                      </span>
+                    )}
                   </div>
                   <Link
                     href={organizationSlug ? `/organizations/${organizationSlug}/settings/profile` : '#'}

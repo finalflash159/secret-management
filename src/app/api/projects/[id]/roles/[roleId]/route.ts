@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { NextRequest } from 'next/server';
+import { requireProjectAccess } from '@/backend/middleware/auth';
+import { success, error } from '@/backend/utils/api-response';
 import { db } from '@/lib/db';
-import { hasPermission } from '@/backend/middleware/permissions';
 import { z } from 'zod';
 
 const updateRoleSchema = z.object({
@@ -18,20 +18,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string; roleId: string }> }
 ) {
   try {
-    const session = await auth();
     const { id: projectId, roleId } = await params;
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const hasAccess = await hasPermission(session.user.id, projectId, 'secret:read');
-    const project = await db.project.findUnique({ where: { id: projectId } });
-    const isOwner = project?.ownerId === session.user.id;
-
-    if (!hasAccess && !isOwner) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-    }
+    // Viewing a single role requires settings:manage
+    await requireProjectAccess(projectId, 'settings:manage');
 
     const role = await db.role.findUnique({
       where: { id: roleId },
@@ -43,13 +32,15 @@ export async function GET(
     });
 
     if (!role || role.projectId !== projectId) {
-      return NextResponse.json({ error: 'Role not found' }, { status: 404 });
+      return error('Role not found', 404);
     }
 
-    return NextResponse.json(role);
-  } catch (error) {
-    console.error('Get role error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return success(role);
+  } catch (err) {
+    console.error('Get role error:', err);
+    const response = handleAuthError(err);
+    if (response) return response;
+    return error('Internal server error', 500);
   }
 }
 
@@ -58,29 +49,17 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; roleId: string }> }
 ) {
   try {
-    const session = await auth();
     const { id: projectId, roleId } = await params;
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const project = await db.project.findUnique({ where: { id: projectId } });
-    const isOwner = project?.ownerId === session.user.id;
-    const hasAccess = await hasPermission(session.user.id, projectId, 'member:manage');
-
-    if (!hasAccess && !isOwner) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-    }
+    await requireProjectAccess(projectId, 'member:manage');
 
     const existing = await db.role.findUnique({ where: { id: roleId } });
     if (!existing || existing.projectId !== projectId) {
-      return NextResponse.json({ error: 'Role not found' }, { status: 404 });
+      return error('Role not found', 404);
     }
 
     // Prevent editing system roles
-    if (['admin', 'editor', 'viewer'].includes(existing.slug)) {
-      return NextResponse.json({ error: 'Cannot edit system roles' }, { status: 400 });
+    if (['admin', 'developer', 'viewer'].includes(existing.slug)) {
+      return error('Cannot edit system roles', 400);
     }
 
     const body = await req.json();
@@ -103,13 +82,15 @@ export async function PUT(
       },
     });
 
-    return NextResponse.json(role);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues[0].message }, { status: 400 });
+    return success(role);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return error(err.issues[0].message, 400);
     }
-    console.error('Update role error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Update role error:', err);
+    const response = handleAuthError(err);
+    if (response) return response;
+    return error('Internal server error', 500);
   }
 }
 
@@ -118,42 +99,47 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; roleId: string }> }
 ) {
   try {
-    const session = await auth();
     const { id: projectId, roleId } = await params;
-
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const project = await db.project.findUnique({ where: { id: projectId } });
-    const isOwner = project?.ownerId === session.user.id;
-    const hasAccess = await hasPermission(session.user.id, projectId, 'member:manage');
-
-    if (!hasAccess && !isOwner) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-    }
+    await requireProjectAccess(projectId, 'member:manage');
 
     const existing = await db.role.findUnique({ where: { id: roleId } });
     if (!existing || existing.projectId !== projectId) {
-      return NextResponse.json({ error: 'Role not found' }, { status: 404 });
+      return error('Role not found', 404);
     }
 
     // Prevent deleting system roles
-    if (['admin', 'editor', 'viewer'].includes(existing.slug)) {
-      return NextResponse.json({ error: 'Cannot delete system roles' }, { status: 400 });
+    if (['admin', 'developer', 'viewer'].includes(existing.slug)) {
+      return error('Cannot delete system roles', 400);
     }
 
     // Check if role has members
     const memberCount = await db.projectMember.count({ where: { roleId } });
     if (memberCount > 0) {
-      return NextResponse.json({ error: 'Cannot delete role with members' }, { status: 400 });
+      return error('Cannot delete role with members', 400);
     }
 
     await db.role.delete({ where: { id: roleId } });
 
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Delete role error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return success({ success: true });
+  } catch (err) {
+    console.error('Delete role error:', err);
+    const response = handleAuthError(err);
+    if (response) return response;
+    return error('Internal server error', 500);
   }
+}
+
+/**
+ * Helper to handle auth errors
+ */
+function handleAuthError(err: unknown) {
+  if (err instanceof Error) {
+    if (err.message === 'Unauthorized') {
+      return error('Unauthorized', 401);
+    }
+    if (err.message === 'Access denied' || err.message === 'Insufficient permissions') {
+      return error(err.message, 403);
+    }
+  }
+  return null;
 }

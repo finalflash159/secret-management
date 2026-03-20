@@ -17,12 +17,10 @@ export const DEFAULT_PERMISSIONS: Record<string, Permission[]> = {
     'folder:manage',
     'member:manage',
     'settings:manage',
-    'project:delete',
   ],
-  editor: [
+  developer: [
     'secret:read',
     'secret:write',
-    'secret:delete',
     'folder:manage',
   ],
   viewer: ['secret:read'],

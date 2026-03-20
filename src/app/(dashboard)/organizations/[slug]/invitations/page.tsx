@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { Copy, RefreshCw, Trash2, Plus, Loader2, Link, Mail, Clock, CheckCircle, XCircle, Users } from 'lucide-react';
+import { Copy, RefreshCw, Trash2, Plus, Loader2, Link, Mail, Clock, CheckCircle, XCircle, Users, Shield } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,6 +49,7 @@ export default function InvitationsPage() {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [stats, setStats] = useState<Stats>({ total: 0, active: 0, used: 0, expired: 0, revoked: 0 });
   const [loading, setLoading] = useState(true);
+  const [userOrgRole, setUserOrgRole] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
 
@@ -60,12 +61,24 @@ export default function InvitationsPage() {
 
   const fetchInvitations = useCallback(async () => {
     try {
-      const res = await fetch(`/api/organizations/${slug}/invitations`);
+      const [res, sessionRes] = await Promise.all([
+        fetch(`/api/organizations/${slug}/invitations`),
+        fetch('/api/auth/session'),
+      ]);
       if (res.ok) {
         const json = await res.json();
         const data = json?.data ?? json;
         setInvitations(data.invitations || []);
         setStats(data.stats || { total: 0, active: 0, used: 0, expired: 0, revoked: 0 });
+      }
+      if (sessionRes.ok && res.ok) {
+        const sessionJson = await sessionRes.json();
+        const json = await res.json();
+        const data = json?.data ?? json;
+        const myMembership = data?.members?.find(
+          (m: { userId: string }) => m.userId === sessionJson?.user?.id
+        );
+        setUserOrgRole(myMembership?.role ?? null);
       }
     } catch (err) {
       console.error('Failed to fetch invitations:', err);
@@ -193,6 +206,20 @@ export default function InvitationsPage() {
     );
   }
 
+  if (!userOrgRole || userOrgRole === 'member') {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="h-12 w-12 rounded-full bg-danger/10 flex items-center justify-center mb-4">
+          <Shield className="h-6 w-6 text-danger" />
+        </div>
+        <h2 className="text-lg font-semibold text-foreground mb-1">Access Restricted</h2>
+        <p className="text-sm text-muted-foreground max-w-sm">
+          You need admin or owner role to manage invitations.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -200,10 +227,12 @@ export default function InvitationsPage() {
           <h1 className="text-xl font-bold text-foreground">Invitations</h1>
           <p className="text-sm text-muted-foreground">Manage invitation codes for your organization</p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
+        {(userOrgRole === 'owner' || userOrgRole === 'admin') && (
+          <Button onClick={() => setShowCreateModal(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Create Invitation
         </Button>
+        )}
       </div>
 
       {/* Stats Cards */}

@@ -6,6 +6,8 @@ import { useSession } from '@/components/session-provider';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 
+type OrgRole = 'owner' | 'admin' | 'member';
+
 interface DashboardLayoutProps {
   children: ReactNode;
 }
@@ -15,42 +17,52 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
   const { user, loading } = useSession();
   const [unreadAlerts, setUnreadAlerts] = useState(0);
+  const [orgRole, setOrgRole] = useState<OrgRole | null>(null);
 
-  // Extract org slug from pathname - use useMemo to ensure consistency
+  // Extract org slug from pathname
   const currentOrgSlug = useMemo(() => {
     const segments = pathname.split('/').filter(Boolean);
-
-    // Known pages under /organizations that DON'T have org slug
     const knownStandalonePages = [
-      'dynamic-secrets',
-      'secret-rotation',
-      'integrations',
-      'folders',
-      'access-control',
-      'audit-logs',
-      'alerts',
-      'billing',
-      'members',
-      'settings',
+      'dynamic-secrets', 'secret-rotation', 'integrations',
+      'folders', 'access-control', 'audit-logs',
+      'alerts', 'billing', 'members', 'settings',
     ];
-
-    // Check if this is a valid org page
-    // /organizations/codelux → orgSlug = codelux
-    // /organizations/codelux/folders → orgSlug = codelux
-    // /organizations/folders → orgSlug = null (should redirect)
     if (segments[0] === 'organizations' && segments[1]) {
       const isStandalonePage = knownStandalonePages.includes(segments[1]);
       const hasPage = segments[2];
-
-      if (isStandalonePage && !hasPage) {
-        return null;
-      }
+      if (isStandalonePage && !hasPage) return null;
       return segments[1];
     }
     return null;
   }, [pathname]);
 
-  // Fetch unread alert count only once on initial load
+  // Fetch org role when slug is set
+  useEffect(() => {
+    async function fetchOrgRole() {
+      if (!currentOrgSlug || !user?.id) {
+        setOrgRole(null);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/organizations/${currentOrgSlug}`);
+        if (res.ok) {
+          const json = await res.json();
+          const data = json?.data ?? json;
+          const myMembership = data?.members?.find(
+            (m: { userId: string }) => m.userId === user.id
+          );
+          setOrgRole(myMembership?.role ?? null);
+        } else {
+          setOrgRole(null);
+        }
+      } catch {
+        setOrgRole(null);
+      }
+    }
+    fetchOrgRole();
+  }, [currentOrgSlug, user?.id]);
+
+  // Fetch unread alert count
   useEffect(() => {
     async function fetchAlertCount() {
       if (!user?.id) return;
@@ -67,14 +79,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     fetchAlertCount();
   }, [user?.id]);
 
-  // Redirect to login if not authenticated - use useEffect to avoid render-time redirect
+  // Redirect to login if not authenticated
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
     }
   }, [loading, user, router]);
 
-  // Show loading only on initial load
   if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -94,6 +105,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             user={user}
             collapsed={false}
             organizationSlug={currentOrgSlug}
+            orgRole={orgRole}
             unreadAlerts={unreadAlerts}
           />
         </div>
@@ -102,6 +114,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             user={user}
             sidebarCollapsed={false}
             organizationSlug={currentOrgSlug}
+            orgRole={orgRole}
             unreadAlerts={unreadAlerts}
           />
           <main className="flex-1 overflow-hidden">

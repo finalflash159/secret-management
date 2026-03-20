@@ -151,9 +151,9 @@ export const projectService = {
               isDefault: false,
             },
             {
-              name: 'Editor',
-              slug: 'editor',
-              permissions: JSON.stringify(DEFAULT_PERMISSIONS.editor),
+              name: 'Developer',
+              slug: 'developer',
+              permissions: JSON.stringify(DEFAULT_PERMISSIONS.developer),
               isDefault: false,
             },
             {
