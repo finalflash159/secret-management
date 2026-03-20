@@ -26,14 +26,15 @@ FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-# [FIX]: Force Prisma to use binary engine for Alpine compatibility
-ENV PRISMA_CLI_QUERY_ENGINE_TYPE="linary"
-ENV PRISMA_CLIENT_ENGINE_TYPE="linary"
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
+
+# Copy Prisma client and engine files (needed at runtime)
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 
 # [FIX]: Use mkdir -p to prevent "No such file or directory" error and set correct permissions
 RUN mkdir -p .next/cache

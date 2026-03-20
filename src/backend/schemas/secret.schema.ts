@@ -35,7 +35,21 @@ export const updateSecretSchema = z.object({
   key: z.string().min(1).max(256).optional(),
   value: z.string().min(1).max(50000).optional(), // Increased to support long keys like RSA
   folderId: z.string().optional(),
-  expiresAt: z.string().datetime().nullable().optional(), // null to remove expiration
+  expiresAt: z.string().optional().refine(
+    (val) => {
+      if (!val || val === '' || val === null) return true;
+      // Accept null to remove expiration
+      // Accept ISO datetime (with or without time)
+      const isoDate = new Date(val);
+      if (!isNaN(isoDate.getTime())) return true;
+      // Accept YYYY-MM-DD date
+      if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return true;
+      // Accept unix timestamp in seconds or milliseconds
+      if (/^\d{10,13}$/.test(val)) return true;
+      return false;
+    },
+    { message: 'Invalid date format. Use YYYY-MM-DD, ISO datetime, or leave empty to remove.' }
+  ),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 

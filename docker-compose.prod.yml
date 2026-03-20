@@ -34,7 +34,7 @@ services:
       AUTH_SECRET: zane_secret_key_123
       AUTH_TRUST_HOST: "true"
       ALLOW_SELF_REGISTRATION: "false"
-      MASTER_INVITE_CODE: "K9xMn2pQ"
+      MASTER_INVITE_CODE: "invite_code"
       MASTER_KEY: zane_master_encryption_key_2026 
     command: sh -c "npx prisma@5.22.0 db push --schema=/app/node_modules/.prisma/client/schema.prisma --skip-generate && node server.js"
 

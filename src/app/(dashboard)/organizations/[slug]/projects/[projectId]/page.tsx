@@ -14,7 +14,6 @@ import {
   EyeOff,
   Copy,
   Check,
-  Pencil,
   Trash2,
   Settings,
   Plus,
@@ -83,7 +82,6 @@ export default function ProjectSecretsPage() {
   const [teamMembers, setTeamMembers] = useState<{id: string; user: {id: string; email: string; name: string | null}; role: {name: string; slug: string}}[]>([]);
   const [memberEmail, setMemberEmail] = useState('');
   const [memberRole, setMemberRole] = useState('developer');
-  const [editingSecret, setEditingSecret] = useState<Secret | null>(null);
   const [selectedSecret, setSelectedSecret] = useState<Secret | null>(null);
   const [visibleSecrets, setVisibleSecrets] = useState<Set<string>>(new Set());
   const [copiedSecret, setCopiedSecret] = useState<string | null>(null);
@@ -257,39 +255,6 @@ export default function ProjectSecretsPage() {
       setSecretKey('');
       setSecretValue('');
       setSecretExpiresAt('');
-      setEditingSecret(null);
-      fetchSecrets();
-    } catch {
-      setError('An error occurred');
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const handleUpdateSecret = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingSecret) return;
-
-    setError('');
-    setCreating(true);
-
-    try {
-      const res = await fetch(`/api/secrets/${editingSecret.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: secretKey, value: secretValue, expiresAt: secretExpiresAt || null }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Failed to update secret');
-        return;
-      }
-
-      setShowSecretModal(false);
-      setSecretKey('');
-      setSecretValue('');
-      setEditingSecret(null);
       fetchSecrets();
     } catch {
       setError('An error occurred');
@@ -506,14 +471,6 @@ export default function ProjectSecretsPage() {
     }
   };
 
-  const openEditModal = (secret: Secret) => {
-    setEditingSecret(secret);
-    setSecretKey(secret.key);
-    setSecretValue(secret.value);
-    setSecretExpiresAt(secret.expiresAt ? secret.expiresAt.split('T')[0] : '');
-    setShowSecretModal(true);
-  };
-
   const toggleSecretVisibility = (secretId: string) => {
     const newVisible = new Set(visibleSecrets);
     if (newVisible.has(secretId)) newVisible.delete(secretId);
@@ -603,7 +560,7 @@ export default function ProjectSecretsPage() {
               </Button>
             )}
             {canWrite && (
-              <Button size="sm" onClick={() => { setEditingSecret(null); setSecretKey(''); setSecretValue(''); setSecretExpiresAt(''); setShowSecretModal(true); }}>
+              <Button size="sm" onClick={() => { setSecretKey(''); setSecretValue(''); setSecretExpiresAt(''); setShowSecretModal(true); }}>
                 <Plus className="h-4 w-4 mr-1" />
                 Add Secret
               </Button>
@@ -712,7 +669,7 @@ export default function ProjectSecretsPage() {
               <h3 className="text-sm font-semibold text-foreground">No secrets</h3>
               <p className="mt-1 text-xs text-muted-foreground">Add your first secret</p>
               {canWrite && (
-                <Button size="sm" className="mt-4" onClick={() => { setEditingSecret(null); setShowSecretModal(true); }}>
+                <Button size="sm" className="mt-4" onClick={() => { setSecretKey(''); setSecretValue(''); setSecretExpiresAt(''); setShowSecretModal(true); }}>
                   <Plus className="h-4 w-4 mr-1" />
                   Add Secret
                 </Button>
@@ -831,14 +788,6 @@ export default function ProjectSecretsPage() {
                         <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />
                       </button>
                     )}
-                    {canWrite && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openEditModal(secret); }}
-                        className="p-1.5 rounded hover:bg-muted/80"
-                      >
-                        <Pencil className="h-4 w-4 text-foreground" />
-                      </button>
-                    )}
                     {canDelete && (
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDeleteSecret(secret.id); }}
@@ -856,7 +805,7 @@ export default function ProjectSecretsPage() {
             {canWrite && (
               <div
                 className="flex items-center gap-2 px-4 py-2.5 border-t border-dashed border-border cursor-pointer hover:bg-muted/50 transition-colors"
-                onClick={() => { setEditingSecret(null); setSecretKey(''); setSecretValue(''); setShowSecretModal(true); }}
+                onClick={() => { setSecretKey(''); setSecretValue(''); setSecretExpiresAt(''); setShowSecretModal(true); }}
               >
                 <div className="w-5 h-5 rounded border border-dashed border-border flex items-center justify-center text-muted-foreground">
                   <Plus className="h-3 w-3" />
@@ -996,12 +945,6 @@ export default function ProjectSecretsPage() {
 
           {/* Panel Footer */}
           <div className="p-4 border-t border-border flex gap-2">
-            {canWrite && (
-              <Button variant="outline" size="sm" className="flex-1 justify-center" onClick={() => openEditModal(selectedSecret)}>
-                <Pencil className="h-4 w-4 mr-1" />
-                Edit
-              </Button>
-            )}
             {canRotate && (
               <Button variant="gold" size="sm" className="flex-1 justify-center" onClick={() => handleRotateSecret(selectedSecret.id)}>
                 <RefreshCwIcon className="h-4 w-4 mr-1" />
@@ -1025,10 +968,10 @@ export default function ProjectSecretsPage() {
       {/* Secret Modal */}
       <Modal
         isOpen={showSecretModal}
-        onClose={() => { setShowSecretModal(false); setEditingSecret(null); setSecretExpiresAt(''); setShowValue(false); }}
-        title={editingSecret ? 'Edit Secret' : 'New Secret'}
+        onClose={() => { setShowSecretModal(false); setSecretKey(''); setSecretValue(''); setSecretExpiresAt(''); setShowValue(false); }}
+        title="New Secret"
       >
-        <form onSubmit={editingSecret ? handleUpdateSecret : handleCreateSecret} className="space-y-4">
+        <form onSubmit={handleCreateSecret} className="space-y-4">
           {error && <div className="text-xs text-danger">{error}</div>}
           <div className="space-y-1.5">
             <Label htmlFor="key">Key</Label>
@@ -1111,11 +1054,11 @@ export default function ProjectSecretsPage() {
             </p>
           </div>
           <div className="flex justify-end gap-2 pt-1">
-            <Button type="button" variant="outline" size="sm" onClick={() => { setShowSecretModal(false); setEditingSecret(null); setSecretExpiresAt(''); setShowValue(false); }}>
+            <Button type="button" variant="outline" size="sm" onClick={() => { setShowSecretModal(false); setSecretKey(''); setSecretValue(''); setSecretExpiresAt(''); setShowValue(false); }}>
               Cancel
             </Button>
             <Button type="submit" disabled={creating} size="sm">
-              {creating ? 'Saving...' : editingSecret ? 'Update' : 'Create'}
+              {creating ? 'Creating...' : 'Create'}
             </Button>
           </div>
         </form>
