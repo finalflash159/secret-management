@@ -7,8 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "bootstrap": "ts-node --compiler-options '{\"module\":\"commonjs\"}' scripts/bootstrap-admin.ts",
+    "bootstrap": "npx prisma db seed",
     "seed:demo": "ts-node --compiler-options '{\"module\":\"commonjs\"}' prisma/seed-demo.ts"
+  },
+  "prisma": {
+    "seed": "node prisma/seed-admin.mjs"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
