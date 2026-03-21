@@ -15,15 +15,9 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import { randomBytes, createHash } from 'crypto';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
-
-function hashPassword(password) {
-  const salt = randomBytes(16).toString('hex');
-  const hash = createHash('sha256').update(salt + password).digest('hex');
-  return `$2a$12$${salt}$${hash}`; // bcrypt-format for compatibility
-}
 
 async function main() {
   console.log('\n🔐  Secret Manager — Bootstrap Admin\n');
@@ -89,7 +83,7 @@ async function main() {
   console.log('\n⏳  Creating admin user...\n');
 
   try {
-    const hashedPassword = hashPassword(password);
+    const hashedPassword = await bcrypt.hash(password, 12);
     const user = await prisma.user.create({
       data: {
         email: email.toLowerCase(),
