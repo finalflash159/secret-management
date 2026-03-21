@@ -38,6 +38,8 @@ COPY --from=builder /app/public ./public
 # Copy Prisma client and engine files (needed at runtime)
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+# Copy Prisma CLI package (symlinked by .bin/prisma)
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
 # Copy node_modules/.bin (contains prisma CLI symlinks)
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.bin ./node_modules/.bin
 # Copy Prisma schema (needed for seed command)
