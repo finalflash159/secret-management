@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { requireProjectAccess } from '@/backend/middleware/auth';
+import { requireProjectAccess, handleAuthError } from '@/backend/middleware/auth';
 import { success, handleZodError, error } from '@/backend/utils/api-response';
 import { createSecretSchema, listSecretsQuerySchema } from '@/backend/schemas';
 import { secretService } from '@/backend/services';
@@ -68,19 +68,4 @@ export async function POST(
     }
     return handleZodError(err);
   }
-}
-
-/**
- * Helper to handle auth errors
- */
-function handleAuthError(err: unknown) {
-  if (err instanceof Error) {
-    if (err.message === 'Unauthorized') {
-      return error('Unauthorized', 401);
-    }
-    if (err.message === 'Access denied' || err.message === 'Insufficient permissions') {
-      return error(err.message, 403);
-    }
-  }
-  return null;
 }

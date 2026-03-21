@@ -19,21 +19,27 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [unreadAlerts, setUnreadAlerts] = useState(0);
   const [orgRole, setOrgRole] = useState<OrgRole | null>(null);
 
-  // Extract org slug from pathname
-  const currentOrgSlug = useMemo(() => {
+  // Extract org slug and current project id from pathname
+  const { currentOrgSlug, currentProjectId } = useMemo(() => {
     const segments = pathname.split('/').filter(Boolean);
     const knownStandalonePages = [
       'dynamic-secrets', 'secret-rotation', 'integrations',
       'folders', 'access-control', 'audit-logs',
       'alerts', 'billing', 'members', 'settings',
     ];
+    let orgSlug: string | null = null;
+    let projectId: string | null = null;
     if (segments[0] === 'organizations' && segments[1]) {
       const isStandalonePage = knownStandalonePages.includes(segments[1]);
       const hasPage = segments[2];
-      if (isStandalonePage && !hasPage) return null;
-      return segments[1];
+      if (isStandalonePage && !hasPage) orgSlug = null;
+      else orgSlug = segments[1];
+      // Check if we're in a project page: /organizations/[slug]/projects/[projectId]/...
+      if (segments[2] === 'projects' && segments[3]) {
+        projectId = segments[3];
+      }
     }
-    return null;
+    return { currentOrgSlug: orgSlug, currentProjectId: projectId };
   }, [pathname]);
 
   // Fetch org role when slug is set
@@ -106,6 +112,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             collapsed={false}
             organizationSlug={currentOrgSlug}
             orgRole={orgRole}
+            currentProjectId={currentProjectId}
             unreadAlerts={unreadAlerts}
           />
         </div>

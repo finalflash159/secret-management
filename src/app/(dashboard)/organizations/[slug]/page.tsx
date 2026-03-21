@@ -9,17 +9,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Modal } from '@/components/ui/modal';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Folder, Key, Server, Plus, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Folder, Key, Server, Plus, ArrowRight, Shield } from 'lucide-react';
 
 interface Project {
   id: string;
   name: string;
   slug: string;
+  ownerId: string;
   environments: { id: string; name: string; slug: string }[];
   _count: {
     secrets: number;
     folders: number;
   };
+  members?: { userId: string }[];
 }
 
 interface Organization {
@@ -27,12 +29,15 @@ interface Organization {
   name: string;
   slug: string;
   projects: Project[];
+  members?: { userId: string; role: string }[];
 }
 
 export default function OrganizationProjectsPage() {
   const params = useParams();
   const slug = params.slug as string;
   const [organization, setOrganization] = useState<Organization | null>(null);
+  const [userOrgRole, setUserOrgRole] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -47,11 +52,23 @@ export default function OrganizationProjectsPage() {
 
   const fetchOrganization = async () => {
     try {
-      const res = await fetch(`/api/organizations/${slug}`);
-      if (res.ok) {
-        const json = await res.json();
+      const [orgRes, sessionRes] = await Promise.all([
+        fetch(`/api/organizations/${slug}`),
+        fetch('/api/auth/session'),
+      ]);
+      if (orgRes.ok) {
+        const json = await orgRes.json();
         const data = json?.data ?? json;
         setOrganization(data);
+        if (sessionRes.ok) {
+          const sessionJson = await sessionRes.json();
+          const uid = sessionJson?.user?.id;
+          setUserId(uid);
+          const myMembership = data?.members?.find(
+            (m: { userId: string }) => m.userId === uid
+          );
+          setUserOrgRole(myMembership?.role ?? null);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch organization:', err);
@@ -107,8 +124,16 @@ export default function OrganizationProjectsPage() {
     return 'env-test';
   };
 
-  const totalSecrets = organization?.projects?.reduce((sum, p) => sum + (p._count?.secrets ?? 0), 0) ?? 0;
-  const totalEnvs = organization?.projects?.reduce((sum, p) => sum + (p.environments?.length ?? 0), 0) ?? 0;
+  // Member chỉ thấy projects mà họ có quyền truy cập
+  const isAdmin = userOrgRole === 'owner' || userOrgRole === 'admin';
+  const visibleProjects = isAdmin
+    ? organization?.projects ?? []
+    : (organization?.projects ?? []).filter(
+        (p) => p.ownerId === userId || (p.members ?? []).some((m) => m.userId === userId)
+      );
+  const hasNoProject = visibleProjects.length === 0;
+  const totalSecrets = visibleProjects.reduce((sum, p) => sum + (p._count?.secrets ?? 0), 0) ?? 0;
+  const totalEnvs = visibleProjects.reduce((sum, p) => sum + (p.environments?.length ?? 0), 0) ?? 0;
 
   if (loading) {
     return (
@@ -153,10 +178,12 @@ export default function OrganizationProjectsPage() {
             <p className="text-xs text-muted-foreground">Projects & secrets</p>
           </div>
         </div>
-        <Button onClick={() => setShowCreateModal(true)} size="sm">
-          <Plus className="h-4 w-4 mr-1.5" />
-          New Project
-        </Button>
+        {(userOrgRole === 'owner' || userOrgRole === 'admin') && (
+          <Button onClick={() => setShowCreateModal(true)} size="sm">
+            <Plus className="h-4 w-4 mr-1.5" />
+            New Project
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -165,7 +192,7 @@ export default function OrganizationProjectsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-muted-foreground">Projects</p>
-              <p className="text-xl font-extrabold text-foreground">{organization.projects.length}</p>
+              <p className="text-xl font-extrabold text-foreground">{visibleProjects.length}</p>
             </div>
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-surface">
               <Folder className="h-4 w-4 text-muted-foreground" />
@@ -199,7 +226,19 @@ export default function OrganizationProjectsPage() {
       </div>
 
       {/* Projects */}
-      {!organization.projects || organization.projects.length === 0 ? (
+      {hasNoProject && userOrgRole === 'member' ? (
+        <Card className="border-dashed border-2 border-border bg-card/50">
+          <CardContent className="flex flex-col items-center justify-center py-10">
+            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-surface">
+              <Shield className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <h3 className="text-sm font-semibold text-foreground">Chưa có project nào</h3>
+            <p className="mt-1 text-center text-xs text-muted-foreground max-w-xs">
+              Bạn chưa được thêm vào project nào. Liên hệ admin để được cấp quyền truy cập project.
+            </p>
+          </CardContent>
+        </Card>
+      ) : !visibleProjects || visibleProjects.length === 0 ? (
         <Card className="border-dashed border-2 border-border bg-card/50">
           <CardContent className="flex flex-col items-center justify-center py-10">
             <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-surface">
@@ -217,7 +256,7 @@ export default function OrganizationProjectsPage() {
         </Card>
       ) : (
         <div className="grid gap-2.5 md:grid-cols-2 lg:grid-cols-3">
-          {organization.projects.map((project) => (
+          {visibleProjects.map((project) => (
             <Link key={project.id} href={`/organizations/${slug}/projects/${project.id}`}>
               <Card className="cursor-pointer bg-card border-border hover:border-border-hover transition-all group">
                 <CardContent className="p-3">

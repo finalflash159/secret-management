@@ -7,6 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
+interface ProjectInfo {
+  id: string;
+  name: string;
+  ownerId: string;
+  members?: { userId: string }[];
+}
+
 interface AuditLog {
   id: string;
   action: string;
@@ -27,46 +34,59 @@ export default function AuditLogsPage() {
 
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userOrgRole, setUserOrgRole] = useState<string | null>(null);
   const [filter, setFilter] = useState('all');
+  const [hasAccess, setHasAccess] = useState(false);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const [orgRes, projectsRes, sessionRes] = await Promise.all([
+      const [orgRes, sessionRes] = await Promise.all([
         fetch(`/api/organizations/${slug}`),
-        fetch(`/api/projects?orgSlug=${slug}`),
         fetch('/api/auth/session'),
       ]);
 
-      // Set user's org role
+      let currentUserId: string | null = null;
       if (orgRes.ok && sessionRes.ok) {
         const orgJson = await orgRes.json();
         const orgData = orgJson?.data ?? orgJson;
         const sessionJson = await sessionRes.json();
+        currentUserId = sessionJson?.user?.id ?? null;
         const myMembership = orgData?.members?.find(
-          (m: { userId: string }) => m.userId === sessionJson?.user?.id
+          (m: { userId: string }) => m.userId === currentUserId
         );
-        setUserOrgRole(myMembership?.role ?? null);
-      }
+        const isAdmin = myMembership?.role === 'owner' || myMembership?.role === 'admin';
 
-      if (projectsRes.ok) {
-        const projects = await projectsRes.json();
+        // Member chỉ thấy logs từ projects họ có quyền
+        // Admin/owner thấy tất cả projects
+        const allProjects: ProjectInfo[] = orgData?.projects ?? [];
+        const accessibleProjects = isAdmin
+          ? allProjects
+          : allProjects.filter(
+              (p) => p.ownerId === currentUserId || (p.members ?? []).some((m) => m.userId === currentUserId)
+            );
 
-        // Fetch audit logs for each project
+        if (accessibleProjects.length === 0) {
+          setHasAccess(false);
+          setLogs([]);
+          setLoading(false);
+          return;
+        }
+        setHasAccess(true);
+
+        // Fetch audit logs for accessible projects
         const allLogs: AuditLog[] = [];
-        for (const project of projects) {
+        for (const project of accessibleProjects) {
           const logsRes = await fetch(`/api/projects/${project.id}/audit-logs`);
           if (logsRes.ok) {
             const projectLogs = await logsRes.json();
-            allLogs.push(...projectLogs.map((log: AuditLog) => ({
+            const data = Array.isArray(projectLogs) ? projectLogs : (projectLogs?.data ?? []);
+            allLogs.push(...data.map((log: AuditLog) => ({
               ...log,
               projectName: project.name,
             })));
           }
         }
 
-        // Sort by date descending
         allLogs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         setLogs(allLogs);
       }
@@ -106,16 +126,15 @@ export default function AuditLogsPage() {
     );
   }
 
-  // Non-admin/member users cannot access audit logs
-  if (!userOrgRole || userOrgRole === 'member') {
+  if (!hasAccess) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <div className="h-12 w-12 rounded-full bg-danger/10 flex items-center justify-center mb-4">
           <FileText className="h-6 w-6 text-danger" />
         </div>
-        <h2 className="text-lg font-semibold text-foreground mb-1">Access Restricted</h2>
+        <h2 className="text-lg font-semibold text-foreground mb-1">Chưa có quyền truy cập</h2>
         <p className="text-sm text-muted-foreground max-w-sm">
-          You need admin or owner role to view audit logs.
+          Bạn chưa được thêm vào project nào. Liên hệ admin để được cấp quyền xem audit logs.
         </p>
       </div>
     );
@@ -153,9 +172,7 @@ export default function AuditLogsPage() {
       {/* Logs List */}
       <Card className="bg-card border-border">
         <CardContent className="p-0">
-          {loading ? (
-            <div className="p-8 text-center text-muted-foreground">Loading...</div>
-          ) : filteredLogs.length === 0 ? (
+          {filteredLogs.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">No audit logs found</div>
           ) : (
             <div className="divide-y divide-border">

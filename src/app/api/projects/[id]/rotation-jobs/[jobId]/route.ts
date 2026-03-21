@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { requireProjectAccess } from '@/backend/middleware/auth';
+import { requireProjectAccess, handleAuthError } from '@/backend/middleware/auth';
 import { success, error } from '@/backend/utils/api-response';
 import { rotationService } from '@/backend/services';
 
@@ -111,19 +111,4 @@ export async function POST(
     if (response) return response;
     return error('Internal server error', 500);
   }
-}
-
-/**
- * Helper to handle auth errors
- */
-function handleAuthError(err: unknown) {
-  if (err instanceof Error) {
-    if (err.message === 'Unauthorized') {
-      return error('Unauthorized', 401);
-    }
-    if (err.message === 'Access denied') {
-      return error(err.message, 403);
-    }
-  }
-  return null;
 }

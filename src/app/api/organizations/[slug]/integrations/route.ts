@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { requireOrgAccess } from '@/backend/middleware/auth';
+import { requireOrgAccess, handleAuthError } from '@/backend/middleware/auth';
 import { success, error } from '@/backend/utils/api-response';
 import { organizationService, integrationService } from '@/backend/services';
 
@@ -20,7 +20,7 @@ export async function GET(
     }
 
     // Check access
-    await requireOrgAccess(organization.id, 'member');
+    await requireOrgAccess(organization.id, 'admin');
 
     const integrations = await integrationService.getByOrgId(organization.id);
     return success(integrations);
@@ -77,19 +77,4 @@ export async function POST(
     }
     return error('Internal server error', 500);
   }
-}
-
-/**
- * Helper to handle auth errors
- */
-function handleAuthError(err: unknown) {
-  if (err instanceof Error) {
-    if (err.message === 'Unauthorized') {
-      return error('Unauthorized', 401);
-    }
-    if (err.message === 'Access denied' || err.message.includes('access required')) {
-      return error(err.message, 403);
-    }
-  }
-  return null;
 }

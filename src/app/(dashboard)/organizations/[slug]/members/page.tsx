@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Modal } from '@/components/ui/modal';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { useToast } from '@/components/ui/toast';
 
 interface Member {
   id: string;
@@ -25,6 +26,8 @@ interface Member {
 export default function MembersPage() {
   const params = useParams();
   const slug = params.slug as string;
+  const { addToast } = useToast();
+  const [createdCode, setCreatedCode] = useState<{ code: string; link: string } | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [userOrgRole, setUserOrgRole] = useState<string | null>(null);
@@ -38,7 +41,6 @@ export default function MembersPage() {
   const [codeMaxUses, setCodeMaxUses] = useState<number>(1);
   const [codeExpiresInDays, setCodeExpiresInDays] = useState<number>(30);
   const [error, setError] = useState('');
-  const [updatingMemberId, setUpdatingMemberId] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<{ id: string; name: string } | null>(null);
 
   const fetchMembers = useCallback(async () => {
@@ -103,7 +105,8 @@ export default function MembersPage() {
         setCodeEmail('');
         setCodeMaxUses(1);
         setCodeExpiresInDays(30);
-        alert(`Invitation code created!\n\nCode: ${code}\nLink: ${inviteLink}`);
+        setCreatedCode({ code, link: inviteLink });
+        addToast({ title: 'Invitation code created', variant: 'success' });
       } else {
         // Invite by email (existing user)
         const res = await fetch(`/api/organizations/${slug}/members`, {
@@ -141,36 +144,15 @@ export default function MembersPage() {
 
       if (res.ok) {
         fetchMembers();
+        addToast({ title: 'Member removed', variant: 'success' });
       } else {
         const data = await res.json();
-        alert(data.error || 'Failed to remove member');
+        addToast({ title: data.error || 'Failed to remove member', variant: 'error' });
       }
     } catch {
-      alert('An error occurred. Please try again.');
+      addToast({ title: 'An error occurred. Please try again.', variant: 'error' });
     } finally {
       setConfirmRemove(null);
-    }
-  };
-
-  const handleUpdateRole = async (memberId: string, newRole: 'admin' | 'member') => {
-    setUpdatingMemberId(memberId);
-    try {
-      const res = await fetch(`/api/organizations/${slug}/members/${memberId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: newRole }),
-      });
-
-      if (res.ok) {
-        fetchMembers();
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to update role');
-      }
-    } catch {
-      alert('An error occurred. Please try again.');
-    } finally {
-      setUpdatingMemberId(null);
     }
   };
 
@@ -223,6 +205,50 @@ export default function MembersPage() {
         )}
       </div>
 
+      {/* Created code display */}
+      {createdCode && (
+        <Card className="bg-card border-border">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <p className="text-sm font-medium text-foreground">Invitation code created</p>
+                <p className="text-xs text-muted-foreground font-mono mt-1">{createdCode.code}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 break-all">{createdCode.link}</p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(createdCode.code);
+                    addToast({ title: 'Code copied', variant: 'success' });
+                  }}
+                >
+                  Copy Code
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(createdCode.link);
+                    addToast({ title: 'Link copied', variant: 'success' });
+                  }}
+                >
+                  Copy Link
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCreatedCode(null)}
+                >
+                  Dismiss
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card className="bg-card border-border">
         <CardContent className="p-0">
           {members.length === 0 ? (
@@ -249,21 +275,9 @@ export default function MembersPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    {member.role === 'owner' ? (
-                      <span className={`text-xs px-2 py-1 rounded-full border ${getRoleBadgeVariant(member.role)}`}>
-                        Owner
-                      </span>
-                    ) : (
-                      <select
-                        value={member.role}
-                        onChange={(e) => handleUpdateRole(member.id, e.target.value as 'admin' | 'member')}
-                        disabled={updatingMemberId === member.id}
-                        className="text-xs px-2 py-1 rounded-md border bg-transparent focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
-                      >
-                        <option value="member">Member</option>
-                        <option value="admin">Admin</option>
-                      </select>
-                    )}
+                    <span className={`text-xs px-2 py-1 rounded-full border ${getRoleBadgeVariant(member.role)}`}>
+                      {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                    </span>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -298,7 +312,7 @@ export default function MembersPage() {
           <div className="flex border-b border-border mb-4">
             <button
               type="button"
-              onClick={() => setInviteType('email')}
+              onClick={() => { setInviteType('email'); setInviteRole('member'); }}
               className={`flex-1 pb-2 text-sm font-medium border-b-2 transition-colors ${
                 inviteType === 'email'
                   ? 'border-primary text-foreground'
@@ -309,7 +323,7 @@ export default function MembersPage() {
             </button>
             <button
               type="button"
-              onClick={() => setInviteType('code')}
+              onClick={() => { setInviteType('code'); setInviteRole('member'); }}
               className={`flex-1 pb-2 text-sm font-medium border-b-2 transition-colors ${
                 inviteType === 'code'
                   ? 'border-primary text-foreground'

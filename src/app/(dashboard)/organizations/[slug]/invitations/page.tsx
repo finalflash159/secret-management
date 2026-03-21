@@ -77,14 +77,22 @@ export default function InvitationsPage() {
         setInvitations(data.invitations || []);
         setStats(data.stats || { total: 0, active: 0, used: 0, expired: 0, revoked: 0 });
       }
-      if (sessionRes.ok && orgRes.ok) {
+      // Always determine role when session exists
+      if (sessionRes.ok) {
         const sessionJson = await sessionRes.json();
-        const orgJson = await orgRes.json();
-        const orgData = orgJson?.data ?? orgJson;
-        const myMembership = orgData?.members?.find(
-          (m: { userId: string }) => m.userId === sessionJson?.user?.id
-        );
-        setUserOrgRole(myMembership?.role ?? null);
+        const userId = sessionJson?.user?.id;
+        if (userId) {
+          if (orgRes.ok) {
+            const orgJson = await orgRes.json();
+            const orgData = orgJson?.data ?? orgJson;
+            const myMembership = orgData?.members?.find(
+              (m: { userId: string }) => m.userId === userId
+            );
+            setUserOrgRole(myMembership?.role ?? null);
+          } else {
+            setUserOrgRole(null);
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to fetch invitations:', err);

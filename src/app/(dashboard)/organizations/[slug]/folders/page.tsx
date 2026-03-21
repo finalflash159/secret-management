@@ -26,6 +26,8 @@ interface Project {
   id: string;
   name: string;
   slug: string;
+  ownerId: string;
+  members?: { userId: string }[];
 }
 
 interface Environment {
@@ -66,28 +68,40 @@ export default function FoldersPage() {
         fetch(`/api/organizations/${slug}`),
         fetch('/api/auth/session'),
       ]);
-      if (orgRes.ok) {
-        const json = await orgRes.json();
-        const data = json?.data ?? json;
-        setProjects(data.projects || []);
-        if (data.projects?.length > 0) {
-          setSelectedProject(data.projects[0].id);
-        }
-      }
-      if (sessionRes.ok) {
-        const sessionJson = await sessionRes.json();
-        const userId = sessionJson?.user?.id;
-        if (userId && orgRes.ok) {
-          const json = await orgRes.json();
-          const data = json?.data ?? json;
-          const myMembership = data?.members?.find(
-            (m: { userId: string }) => m.userId === userId
-          );
-          setUserOrgRole(myMembership?.role ?? null);
+
+      // Read responses in parallel to avoid body consumption issues
+      const [orgJson, sessionJson] = await Promise.all([
+        orgRes.ok ? orgRes.json() : null,
+        sessionRes.ok ? sessionRes.json() : null,
+      ]);
+      const orgData = (orgJson?.data ?? orgJson) ?? null;
+      const userId = sessionJson?.user?.id ?? null;
+
+      if (orgData && userId) {
+        const myMembership = orgData.members?.find(
+          (m: { userId: string }) => m.userId === userId
+        );
+        setUserOrgRole(myMembership?.role ?? null);
+
+        const isAdmin = myMembership?.role === 'owner' || myMembership?.role === 'admin';
+
+        // Filter to only projects the user has access to
+        const allProjects: Project[] = orgData.projects ?? [];
+        const accessibleProjects = isAdmin
+          ? allProjects
+          : allProjects.filter(
+              (p) => p.ownerId === userId || (p.members ?? []).some((m: { userId: string }) => m.userId === userId)
+            );
+
+        setProjects(accessibleProjects);
+        if (accessibleProjects.length > 0) {
+          setSelectedProject(accessibleProjects[0].id);
         }
       }
     } catch (err) {
       console.error('Failed to fetch projects:', err);
+    } finally {
+      setLoading(false);
     }
   }, [slug]);
 
@@ -136,7 +150,7 @@ export default function FoldersPage() {
 
   useEffect(() => {
     fetchEnvironments();
-  }, [fetchEnvironments]);
+  }, [fetchEnvironments, selectedProject]);
 
   useEffect(() => {
     fetchFolders();

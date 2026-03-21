@@ -82,6 +82,11 @@ img,
   --color-danger: #ef4444;
   --color-info: #3b82f6;
 
+  /* Short aliases for component use */
+  --danger: #ef4444;
+  --success: #22c55e;
+  --warning: #f59e0b;
+
   /* ─── Environment Colors ─── */
   --color-prod: #22c55e;
   --color-dev: #3b82f6;
@@ -127,6 +132,11 @@ img,
   --color-warning: #fbbf24;
   --color-danger: #f87171;
   --color-info: #60a5fa;
+
+  /* Short aliases for component use */
+  --danger: #f87171;
+  --success: #4ade80;
+  --warning: #fbbf24;
 
   /* ─── Environment Colors ─── */
   --color-prod: #4ade80;

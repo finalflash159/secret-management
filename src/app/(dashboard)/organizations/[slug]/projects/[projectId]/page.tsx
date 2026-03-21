@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Modal } from '@/components/ui/modal';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Badge } from '@/components/ui/badge';
+import { Combobox } from '@/components/ui/combobox';
 import {
   Eye,
   EyeOff,
@@ -83,11 +84,14 @@ export default function ProjectSecretsPage() {
   const [teamMembers, setTeamMembers] = useState<{id: string; user: {id: string; email: string; name: string | null}; role: {name: string; slug: string}}[]>([]);
   const [memberEmail, setMemberEmail] = useState('');
   const [memberRole, setMemberRole] = useState('developer');
+  const [searchResults, setSearchResults] = useState<{id: string; email: string; name: string | null}[]>([]);
+  const [searchingMembers, setSearchingMembers] = useState(false);
   const [selectedSecret, setSelectedSecret] = useState<Secret | null>(null);
   const [visibleSecrets, setVisibleSecrets] = useState<Set<string>>(new Set());
   const [copiedSecret, setCopiedSecret] = useState<string | null>(null);
   const [showValue, setShowValue] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const searchQueryRef = useRef('');
 
   // Form states
   const [secretKey, setSecretKey] = useState('');
@@ -404,6 +408,37 @@ export default function ProjectSecretsPage() {
   const openTeamModal = () => {
     setShowTeamModal(true);
     fetchTeamMembers();
+    // Pre-load available org members (not yet in project)
+    fetchAvailableOrgMembers('');
+    searchQueryRef.current = '';
+    setSearchQuery('');
+  };
+
+  const fetchAvailableOrgMembers = async (query: string) => {
+    const currentQuery = query; // capture for closure
+    setSearchingMembers(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/members/search`);
+      if (res.ok) {
+        const json = await res.json();
+        const users = json?.data ?? json;
+        // Guard: ignore response if user already typed a different query
+        if (currentQuery !== searchQueryRef.current) return;
+        if (currentQuery) {
+          const q = currentQuery.toLowerCase();
+          setSearchResults(users.filter((u: { email: string; name: string | null }) =>
+            u.email.toLowerCase().includes(q) ||
+            (u.name && u.name.toLowerCase().includes(q))
+          ));
+        } else {
+          setSearchResults(users);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to search org members:', err);
+    } finally {
+      setSearchingMembers(false);
+    }
   };
 
   const handleAddMember = async (e: React.FormEvent) => {
@@ -1189,14 +1224,21 @@ export default function ProjectSecretsPage() {
         <div className="space-y-4">
           {/* Add Member Form */}
           <form onSubmit={handleAddMember} className="flex gap-2">
-            <Input
-              type="email"
-              value={memberEmail}
-              onChange={(e) => setMemberEmail(e.target.value)}
-              placeholder="User email"
-              className="h-8 flex-1"
-              required
-            />
+            <div className="flex-1">
+              <Combobox
+                value={memberEmail}
+                onChange={(val) => { setMemberEmail(val); setSearchQuery(''); }}
+                onSearch={(q) => { searchQueryRef.current = q; setSearchQuery(q); fetchAvailableOrgMembers(q); }}
+                options={searchResults.map((u) => ({
+                  value: u.email,
+                  label: u.name || u.email,
+                  sublabel: u.name ? u.email : undefined,
+                }))}
+                placeholder="Search org member..."
+                loading={searchingMembers}
+                emptyMessage="No org members found"
+              />
+            </div>
             <select
               value={memberRole}
               onChange={(e) => setMemberRole(e.target.value)}
@@ -1206,7 +1248,7 @@ export default function ProjectSecretsPage() {
               <option value="developer">Developer</option>
               <option value="viewer">Viewer</option>
             </select>
-            <Button type="submit" disabled={creating} size="sm">Add</Button>
+            <Button type="submit" disabled={creating || !memberEmail} size="sm">Add</Button>
           </form>
 
           {/* Members List */}

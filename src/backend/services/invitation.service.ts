@@ -110,7 +110,7 @@ export const invitationService = {
   async validateForRegistration(
     code: string,
     email: string
-  ): Promise<{ valid: boolean; error?: string; role?: RoleType; invitationId?: string; orgId?: string }> {
+  ): Promise<{ valid: boolean; error?: string; role?: RoleType; invitationId?: string; orgId?: string; createdBy?: string | null }> {
     const invitation = await this.getByCode(code);
 
     if (!invitation) {
@@ -143,6 +143,7 @@ export const invitationService = {
       role: invitation.role,
       invitationId: invitation.id,
       orgId: invitation.orgId,
+      createdBy: invitation.createdBy,
     };
   },
 

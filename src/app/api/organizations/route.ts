@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { requireAuth } from '@/backend/middleware/auth';
+import { requireAuth, handleAuthError } from '@/backend/middleware/auth';
 import { success, handleZodError, error } from '@/backend/utils/api-response';
 import { createOrganizationSchema } from '@/backend/schemas';
 import { organizationService } from '@/backend/services';
@@ -41,24 +41,4 @@ export async function POST(req: NextRequest) {
     }
     return handleZodError(err);
   }
-}
-
-/**
- * Helper to handle auth errors
- */
-function handleAuthError(err: unknown) {
-  if (err && typeof err === 'object') {
-    const errObj = err as Record<string, unknown>;
-    const message = errObj.message;
-    if (message === 'Unauthorized') {
-      return error('Unauthorized', 401);
-    }
-    if (errObj.status === 403) {
-      return error(String(message), 403);
-    }
-    if (errObj.status === 404) {
-      return error(String(message), 404);
-    }
-  }
-  return null;
 }

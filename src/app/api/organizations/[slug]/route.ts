@@ -1,24 +1,8 @@
 import { NextRequest } from 'next/server';
-import { requireOrgAccess, requireOrgOwner } from '@/backend/middleware/auth';
+import { requireOrgAccess, requireOrgOwner, handleAuthError } from '@/backend/middleware/auth';
 import { success, handleZodError, error, notFound } from '@/backend/utils/api-response';
 import { updateOrganizationSchema } from '@/backend/schemas';
 import { organizationService } from '@/backend/services';
-
-/**
- * Helper to handle auth errors
- */
-function handleAuthError(err: unknown) {
-  if (err instanceof Error) {
-    if (err.message === 'Unauthorized') {
-      return error('Unauthorized', 401);
-    }
-    if (err.message === 'Access denied' || err.message.includes('access required')) {
-      return error(err.message, 403);
-    }
-  }
-  return null;
-}
-
 /**
  * GET /api/organizations/[slug] - Get organization by slug
  * PUT /api/organizations/[slug] - Update organization

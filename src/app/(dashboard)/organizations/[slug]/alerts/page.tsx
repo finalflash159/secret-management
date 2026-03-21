@@ -297,20 +297,7 @@ export default function AlertsPage() {
 
   const unreadCount = alerts.filter((a) => !a.read).length;
   const totalPages = Math.ceil(total / limit);
-
-  if (!userOrgRole || userOrgRole === 'member') {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="h-12 w-12 rounded-full bg-danger/10 flex items-center justify-center mb-4">
-          <Shield className="h-6 w-6 text-danger" />
-        </div>
-        <h2 className="text-lg font-semibold text-foreground mb-1">Access Restricted</h2>
-        <p className="text-sm text-muted-foreground max-w-sm">
-          You need admin or owner role to manage alerts.
-        </p>
-      </div>
-    );
-  }
+  const isAdmin = userOrgRole === 'owner' || userOrgRole === 'admin';
 
   return (
     <div className="space-y-4">
@@ -322,7 +309,7 @@ export default function AlertsPage() {
             Stay updated on secrets, security, and team activities
           </p>
         </div>
-        {unreadCount > 0 && (
+        {unreadCount > 0 && isAdmin && (
           <Button variant="outline" size="sm" onClick={handleMarkAllAsRead}>
             <Eye className="h-4 w-4 mr-2" />
             Mark all as read
@@ -456,7 +443,7 @@ export default function AlertsPage() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 shrink-0">
-                      {!alert.read && (
+                      {!alert.read && isAdmin && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -466,15 +453,17 @@ export default function AlertsPage() {
                           <Eye className="h-4 w-4" />
                         </Button>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDelete(alert.id)}
-                        title="Delete"
-                        className="text-muted-foreground hover:text-danger"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {isAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(alert.id)}
+                          title="Delete"
+                          className="text-muted-foreground hover:text-danger"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 );

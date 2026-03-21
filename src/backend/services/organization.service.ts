@@ -59,6 +59,9 @@ export const organizationService = {
           include: {
             environments: true,
             roles: true,
+            members: {
+              select: { userId: true },
+            },
             _count: {
               select: {
                 secrets: true,
@@ -104,6 +107,18 @@ export const organizationService = {
       },
       include: {
         members: true,
+        projects: {
+          include: {
+            environments: true,
+            roles: true,
+            _count: {
+              select: {
+                secrets: true,
+                folders: true,
+              },
+            },
+          },
+        },
         _count: {
           select: {
             projects: true,

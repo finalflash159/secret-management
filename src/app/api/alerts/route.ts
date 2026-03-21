@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
 import { success, unauthorized, error } from '@/backend/utils/api-response';
 import { alertService } from '@/backend/services';
+import { db } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,6 +18,16 @@ export async function GET(request: NextRequest) {
     const read = searchParams.get('read');
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
+
+    // Validate org membership if orgId is provided
+    if (orgId) {
+      const membership = await db.orgMember.findUnique({
+        where: { userId_orgId: { userId: session.user.id, orgId } },
+      });
+      if (!membership) {
+        return error('Not a member of this organization', 403);
+      }
+    }
 
     const result = await alertService.getAlerts({
       userId: session.user.id,

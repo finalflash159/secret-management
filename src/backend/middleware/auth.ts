@@ -92,10 +92,13 @@ export async function requireProjectAccess(
   const isOwner = project.ownerId === user.id;
 
   // If permission is required, check it (owner bypasses permission check)
-  if (permission && !isOwner) {
-    const hasPerm = await hasPermission(user.id, projectId, permission);
-    if (!hasPerm) {
-      throw { status: 403, message: 'Insufficient permissions' };
+  if (permission) {
+    // Owner always has all permissions in their own project
+    if (!isOwner) {
+      const hasPerm = await hasPermission(user.id, projectId, permission);
+      if (!hasPerm) {
+        throw { status: 403, message: 'Insufficient permissions' };
+      }
     }
   }
 
@@ -213,10 +216,12 @@ export async function requireOrgAccessBySlug(
 }
 
 /**
- * Helper to handle auth errors in API routes
- * Returns the appropriate NextResponse if error, null otherwise
+ * Central auth error handler for API routes.
+ * Works with both Error instances and plain { status, message } objects
+ * thrown by requireAuth / requireProjectAccess / requireOrgAccess.
  */
 export function handleAuthError(error: unknown): ReturnType<typeof unauthorized> | null {
+  // Handle plain { status, message } objects (from requireAuth et al.)
   if (isAuthError(error)) {
     if (error.status === 401) {
       return unauthorized(error.message);
@@ -226,6 +231,16 @@ export function handleAuthError(error: unknown): ReturnType<typeof unauthorized>
     }
     if (error.status === 404) {
       return notFound(error.message);
+    }
+    return null;
+  }
+  // Handle Error instances (from other code paths)
+  if (error instanceof Error) {
+    if (error.message === 'Unauthorized') {
+      return unauthorized();
+    }
+    if (error.message === 'Access denied' || error.message === 'Insufficient permissions') {
+      return forbidden(error.message);
     }
   }
   return null;

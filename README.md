@@ -73,8 +73,53 @@ Visit [http://localhost:3002](http://localhost:3002) to start.
 DATABASE_URL="postgresql://user:password@localhost:5432/db"
 NEXTAUTH_URL="http://localhost:3002"
 NEXTAUTH_SECRET="your-secret-key-min-32-chars"
-ENCRYPTION_KEY="your-32-byte-encryption-key"
+MASTER_KEY="your-32-byte-encryption-key"
+SUPER_MASTER_ADMIN=false
+CRON_SECRET="your-cron-secret"
 ```
+
+### Bootstrap
+
+After setting up the database, create the first admin account:
+
+```bash
+npm run bootstrap
+# Interactive mode: follow prompts for email, password, name, super-master flag
+
+# Or non-interactive (CI/automation):
+npm run bootstrap -- --email admin@example.com --password Secret123! --name "Admin"
+
+# Help
+npm run bootstrap -- --help
+```
+
+**CLI flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--email <email>` | Admin email (required in non-interactive mode) |
+| `--password <pass>` | Admin password, min 8 characters (required in non-interactive mode) |
+| `--name <name>` | Display name (optional) |
+| `--help`, `-h` | Show help |
+
+**Validation rules:**
+- Email must be valid format (contain `@`)
+- Password must be at least 8 characters
+- Script exits early if the database already has users
+
+**Behavior:**
+- Exits with code 0 if users already exist (no action taken)
+- Password hashed with bcrypt, cost factor 12
+- Checks database connection before any action
+- `isMasterAdmin` flag is written to the `User` record and controls org creation rights (see below)
+
+**`SUPER_MASTER_ADMIN=true`:**
+- Only the bootstrap admin (`isMasterAdmin=true`) can create organizations
+- All other users must register via org invite codes
+
+**`SUPER_MASTER_ADMIN=false`:**
+- Any authenticated user can create an organization
+- Bootstrap admin is a regular user with no special privileges
 
 ## Project Structure
 

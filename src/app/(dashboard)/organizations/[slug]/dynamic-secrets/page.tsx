@@ -56,6 +56,8 @@ interface Credential {
 interface Project {
   id: string;
   name: string;
+  ownerId: string;
+  members?: { userId: string }[];
 }
 
 const providers = [
@@ -124,25 +126,37 @@ export default function DynamicSecretsPage() {
         fetch(`/api/organizations/${slug}`),
         fetch('/api/auth/session'),
       ]);
-      if (orgRes.ok) {
-        const json = await orgRes.json();
-        const data = json?.data ?? json;
-        setProjects(data.projects || []);
-        if (data.projects?.length > 0) {
-          setSelectedProject(data.projects[0].id);
-        }
-      }
-      if (sessionRes.ok && orgRes.ok) {
-        const sessionJson = await sessionRes.json();
-        const json = await orgRes.json();
-        const data = json?.data ?? json;
-        const myMembership = data?.members?.find(
-          (m: { userId: string }) => m.userId === sessionJson?.user?.id
+
+      // Read orgRes body ONCE
+      const orgData = orgRes.ok ? (await orgRes.json())?.data ?? null : null;
+      const sessionJson = sessionRes.ok ? await sessionRes.json() : null;
+      const userId = sessionJson?.user?.id;
+
+      if (orgData && sessionJson && userId) {
+        const myMembership = orgData.members?.find(
+          (m: { userId: string }) => m.userId === userId
         );
         setUserOrgRole(myMembership?.role ?? null);
+
+        const isAdmin = myMembership?.role === 'owner' || myMembership?.role === 'admin';
+
+        // Filter to only projects the user has access to
+        const allProjects: Project[] = orgData.projects ?? [];
+        const accessibleProjects = isAdmin
+          ? allProjects
+          : allProjects.filter(
+              (p) => p.ownerId === userId || (p.members ?? []).some((m: { userId: string }) => m.userId === userId)
+            );
+
+        setProjects(accessibleProjects);
+        if (accessibleProjects.length > 0) {
+          setSelectedProject(accessibleProjects[0].id);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch projects:', err);
+    } finally {
+      setLoading(false);
     }
   }, [slug]);
 
@@ -209,7 +223,7 @@ export default function DynamicSecretsPage() {
 
   useEffect(() => {
     fetchEnvironments();
-  }, [fetchEnvironments]);
+  }, [fetchEnvironments, selectedProject]);
 
   useEffect(() => {
     fetchDynamicSecrets();
@@ -290,7 +304,6 @@ export default function DynamicSecretsPage() {
   const handleDeleteSecret = async () => {
     const item = confirmDeleteSecret;
     if (!item) return;
-    const name = item.name;
     if (!selectedProject) return;
 
     try {
@@ -476,7 +489,6 @@ export default function DynamicSecretsPage() {
   const handleDeleteJob = async () => {
     const item = confirmDeleteJob;
     if (!item) return;
-    const name = item.name;
     if (!selectedProject) return;
 
     try {

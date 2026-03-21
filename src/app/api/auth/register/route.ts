@@ -9,22 +9,14 @@ const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   name: z.string().optional(),
-  inviteCode: z.string().optional(),
+  inviteCode: z.string(),
 });
 
 /**
- * Registration modes:
+ * Registration: all users must register via an organization invite code.
  *
- * 1. MASTER_INVITE_CODE set:
- *    - Anyone can register with this code
- *    - First user to use it becomes isMasterAdmin=true
- *    - Subsequent uses of the same code are REJECTED (single-use)
- *
- * 2. ALLOW_SELF_REGISTRATION=true (no MASTER_INVITE_CODE):
- *    - Anyone can register freely
- *
- * 3. ALLOW_SELF_REGISTRATION=false (no MASTER_INVITE_CODE):
- *    - Must provide a valid DB invite code (OrgInvitation)
+ * Bootstrap admin is created automatically by src/lib/bootstrap.ts on startup.
+ * This endpoint only handles org invite code registration.
  */
 export async function POST(req: NextRequest) {
   // Rate limit check
@@ -49,7 +41,6 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const validatedData = registerSchema.parse(body);
-    const masterCode = process.env.MASTER_INVITE_CODE;
 
     // Check if user already exists
     const existingUser = await db.user.findUnique({
@@ -62,84 +53,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ── MASTER_INVITE_CODE mode ──────────────────────────────────────────────────
-    if (masterCode) {
-      if (!validatedData.inviteCode) {
-        return NextResponse.json(
-          { error: 'Invitation code is required.' },
-          { status: 403 }
-        );
-      }
-
-      if (validatedData.inviteCode !== masterCode) {
-        return NextResponse.json(
-          { error: 'Invalid invitation code.' },
-          { status: 400 }
-        );
-      }
-
-      // Check if any user has already used this master code
-      const masterAlreadyUsed = await db.user.findFirst({
-        where: { isMasterAdmin: true },
-      });
-      if (masterAlreadyUsed) {
-        return NextResponse.json(
-          { error: 'This invitation code has already been used.' },
-          { status: 400 }
-        );
-      }
-
-      // First user to register with this code → becomes master admin
-      const hashedPassword = await hashPassword(validatedData.password);
-      const user = await db.user.create({
-        data: {
-          email: validatedData.email.toLowerCase(),
-          password: hashedPassword,
-          name: validatedData.name,
-          isMasterAdmin: true,
-        },
-      });
-
-      // Track usage with null invitationId (no DB invite record for master codes)
-      await invitationService.markAsUsed(null, user.id);
-
+    // Validate org invite code
+    const dbValidation = await invitationService.validateForRegistration(
+      validatedData.inviteCode.toUpperCase(),
+      validatedData.email
+    );
+    if (!dbValidation.valid) {
       return NextResponse.json(
-        { id: user.id, email: user.email, name: user.name },
-        { status: 201 }
+        { error: dbValidation.error || 'Invalid invitation code' },
+        { status: 400 }
       );
-    }
-
-    // ── NORMAL mode ─────────────────────────────────────────────────────────────
-    const allowSelfRegistration = process.env.ALLOW_SELF_REGISTRATION === 'true';
-
-    if (!allowSelfRegistration && !validatedData.inviteCode) {
-      return NextResponse.json(
-        { error: 'Registration is by invitation only. Please contact your administrator.' },
-        { status: 403 }
-      );
-    }
-
-    // Validate DB invite code
-    let invitationData: {
-      valid: boolean;
-      error?: string;
-      role?: string;
-      invitationId?: string;
-      orgId?: string;
-    } = { valid: true };
-
-    if (validatedData.inviteCode) {
-      const dbValidation = await invitationService.validateForRegistration(
-        validatedData.inviteCode,
-        validatedData.email
-      );
-      if (!dbValidation.valid) {
-        return NextResponse.json(
-          { error: dbValidation.error || 'Invalid invitation code' },
-          { status: 400 }
-        );
-      }
-      invitationData = dbValidation;
     }
 
     // Hash password and create user
@@ -152,18 +75,17 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // If registered via DB invitation, add to organization
-    if (invitationData.valid && invitationData.invitationId && invitationData.role && invitationData.orgId) {
-      await invitationService.markAsUsed(invitationData.invitationId, user.id);
-      await db.orgMember.create({
-        data: {
-          userId: user.id,
-          orgId: invitationData.orgId,
-          role: invitationData.role as 'admin' | 'member',
-          invitationId: invitationData.invitationId,
-        },
-      });
-    }
+    // Add user to organization
+    await invitationService.markAsUsed(dbValidation.invitationId!, user.id);
+    await db.orgMember.create({
+      data: {
+        userId: user.id,
+        orgId: dbValidation.orgId!,
+        role: dbValidation.role as 'admin' | 'member',
+        invitationId: dbValidation.invitationId!,
+        invitedBy: dbValidation.createdBy ?? null,
+      },
+    });
 
     return NextResponse.json(
       { id: user.id, email: user.email, name: user.name },

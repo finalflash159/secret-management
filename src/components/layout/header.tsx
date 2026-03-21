@@ -284,7 +284,7 @@ function HeaderComponent({ user, organizationSlug, orgRole, unreadAlerts = 0 }: 
                     <User className="h-4 w-4" />
                     Profile
                   </Link>
-                  {organizationSlug && (
+                  {(organizationSlug && (orgRole === 'owner' || orgRole === 'admin')) && (
                     <Link
                       href={`/organizations/${organizationSlug}/settings`}
                       onClick={() => setShowUserMenu(false)}

@@ -16,7 +16,7 @@ services:
       retries: 5
 
   app:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile
     container_name: gondor-next-app
@@ -29,13 +29,13 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/secret_manager
       NODE_ENV: production
-      NEXTAUTH_URL: https://app.g-ondo-r.dev
-      NEXTAUTH_SECRET: zane_secret_key_123
-      AUTH_SECRET: zane_secret_key_123
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-https://app.g-ondo-r.dev}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      AUTH_SECRET: ${NEXTAUTH_SECRET}
       AUTH_TRUST_HOST: "true"
-      ALLOW_SELF_REGISTRATION: "false"
-      MASTER_INVITE_CODE: "invite_code"
-      MASTER_KEY: zane_master_encryption_key_2026 
+      MASTER_KEY: ${MASTER_KEY}
+      SUPER_MASTER_ADMIN: ${SUPER_MASTER_ADMIN:-false}
+      CRON_SECRET: ${CRON_SECRET}
     command: sh -c "npx prisma@5.22.0 db push --schema=/app/node_modules/.prisma/client/schema.prisma --skip-generate && node server.js"
 
 volumes:

@@ -26,6 +26,8 @@ interface Project {
   id: string;
   name: string;
   slug: string;
+  ownerId: string;
+  members?: { userId: string }[];
   roles: Role[];
 }
 
@@ -72,20 +74,29 @@ export default function AccessControlPage() {
         fetch(`/api/organizations/${slug}`),
         fetch('/api/auth/session'),
       ]);
-      if (orgRes.ok) {
-        const json = await orgRes.json();
-        const data = json?.data ?? json;
-        setProjects(data.projects || []);
-        if (data.projects?.length > 0) {
-          setSelectedProject(data.projects[0].id);
-        }
-        // Set user's org role
-        if (sessionRes.ok) {
-          const sessionJson = await sessionRes.json();
-          const myMembership = data?.members?.find(
-            (m: { userId: string }) => m.userId === sessionJson?.user?.id
-          );
-          setUserOrgRole(myMembership?.role ?? null);
+      if (orgRes.ok && sessionRes.ok) {
+        const orgJson = await orgRes.json();
+        const orgData = orgJson?.data ?? orgJson;
+        const sessionJson = await sessionRes.json();
+        const currentUserId = sessionJson?.user?.id;
+        const myMembership = orgData?.members?.find(
+          (m: { userId: string }) => m.userId === currentUserId
+        );
+        setUserOrgRole(myMembership?.role ?? null);
+
+        const isAdmin = myMembership?.role === 'owner' || myMembership?.role === 'admin';
+
+        // Filter to only projects the user has access to
+        const allProjects: Project[] = orgData?.projects ?? [];
+        const accessibleProjects = isAdmin
+          ? allProjects
+          : allProjects.filter(
+              (p) => p.ownerId === currentUserId || (p.members ?? []).some((m: { userId: string }) => m.userId === currentUserId)
+            );
+
+        setProjects(accessibleProjects);
+        if (accessibleProjects.length > 0) {
+          setSelectedProject(accessibleProjects[0].id);
         }
       }
     } catch (err) {
