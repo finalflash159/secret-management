@@ -38,6 +38,8 @@ COPY --from=builder /app/public ./public
 # Copy Prisma client and engine files (needed at runtime)
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+# Copy node_modules/.bin (contains prisma CLI symlinks)
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.bin ./node_modules/.bin
 # Copy Prisma schema (needed for seed command)
 COPY --from=builder --chown=nextjs:nodejs /app/prisma/schema.prisma ./prisma/schema.prisma
 
@@ -61,4 +63,4 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # Bootstrap admin if BOOTSTRAP_EMAIL and BOOTSTRAP_PASSWORD are set, then start app
-CMD ["sh", "-c", "if [ -n \"$BOOTSTRAP_EMAIL\" ] && [ -n \"$BOOTSTRAP_PASSWORD\" ]; then npx prisma db seed; fi && node server.js"]
+CMD ["sh", "-c", "./node_modules/.bin/prisma db push --skip-generate && if [ -n \"$BOOTSTRAP_EMAIL\" ] && [ -n \"$BOOTSTRAP_PASSWORD\" ]; then ./node_modules/.bin/prisma db seed; fi && node server.js"]
