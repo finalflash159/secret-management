@@ -38,6 +38,8 @@ COPY --from=builder /app/public ./public
 # Copy Prisma client and engine files (needed at runtime)
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+# Copy Prisma schema (needed for seed command)
+COPY --from=builder --chown=nextjs:nodejs /app/prisma/schema.prisma ./prisma/schema.prisma
 
 # [FIX]: Use mkdir -p to prevent "No such file or directory" error and set correct permissions
 RUN mkdir -p .next/cache
@@ -47,10 +49,16 @@ RUN chown -R nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Copy bootstrap seed script
+COPY --from=builder --chown=nextjs:nodejs /app/prisma/seed-admin.mjs ./prisma/seed-admin.mjs
+# Copy package.json (needed for prisma seed command config)
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+
 USER nextjs
 
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+# Bootstrap admin if BOOTSTRAP_EMAIL and BOOTSTRAP_PASSWORD are set, then start app
+CMD ["sh", "-c", "if [ -n \"$BOOTSTRAP_EMAIL\" ] && [ -n \"$BOOTSTRAP_PASSWORD\" ]; then npx prisma db seed; fi && node server.js"]

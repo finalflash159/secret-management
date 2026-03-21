@@ -41,39 +41,36 @@ Prisma Studio: `npx prisma studio`
 
 ## 3. Docker Production Mode
 
+**Bootstrap credentials via environment variables** (set in `.env` or directly):
+
 ```bash
-# Rebuild image (use --no-cache to force fresh build)
+# Set in .env first:
+# BOOTSTRAP_EMAIL="admin@gondor.dev"
+# BOOTSTRAP_PASSWORD="Admin123456!"
+# BOOTSTRAP_NAME="Admin"
+
+# Rebuild image
 docker compose -f docker-compose.prod.yml build --no-cache
 
-# Start containers (app on port 3000, Postgres internal only)
+# Start containers — bootstrap admin is created automatically on first startup
 docker compose -f docker-compose.prod.yml up -d
-
-# DB schema auto-applied in container startup (via db push in entrypoint)
-
-# Create first admin
-docker compose -f docker-compose.prod.yml exec app npm run bootstrap -- \
-  --email admin@gondor.dev \
-  --password "Admin123456!" \
-  --name "Admin"
 ```
 
 App: http://localhost:3000
+Login: `admin@gondor.dev` / `Admin123456!`
 
 ---
 
 ## 4. Quick Full Reset (Docker prod)
 
 ```bash
+# Set bootstrap vars, then reset + rebuild + start (admin auto-created on startup)
+BOOTSTRAP_EMAIL="admin@gondor.dev" \
+BOOTSTRAP_PASSWORD="Admin123456!" \
+BOOTSTRAP_NAME="Admin" \
 docker compose -f docker-compose.prod.yml down -v && \
 docker compose -f docker-compose.prod.yml build --no-cache && \
-docker compose -f docker-compose.prod.yml up -d && \
-sleep 5 && \
-docker compose -f docker-compose.prod.yml exec app npx prisma db push && \
-docker compose -f docker-compose.prod.yml exec app npx prisma generate && \
-docker compose -f docker-compose.prod.yml exec app npm run bootstrap -- \
-  --email admin@gondor.dev \
-  --password "Admin123456!" \
-  --name "Admin"
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 ---

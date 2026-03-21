@@ -36,7 +36,17 @@ services:
       MASTER_KEY: ${MASTER_KEY}
       SUPER_MASTER_ADMIN: ${SUPER_MASTER_ADMIN:-false}
       CRON_SECRET: ${CRON_SECRET}
-    command: sh -c "npx prisma@5.22.0 db push --schema=/app/node_modules/.prisma/client/schema.prisma --skip-generate && node server.js"
+      BOOTSTRAP_EMAIL: ${BOOTSTRAP_EMAIL:-}
+      BOOTSTRAP_PASSWORD: ${BOOTSTRAP_PASSWORD:-}
+      BOOTSTRAP_NAME: ${BOOTSTRAP_NAME:-}
+    command: >
+      sh -c "
+        npx prisma db push --skip-generate &&
+        if [ -n \"$$BOOTSTRAP_EMAIL\" ] && [ -n \"$$BOOTSTRAP_PASSWORD\" ]; then
+          npx prisma db seed;
+        fi &&
+        node server.js
+      "
 
 volumes:
   postgres_data:
