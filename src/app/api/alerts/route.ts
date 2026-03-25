@@ -14,10 +14,15 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const orgId = searchParams.get('orgId') || undefined;
     const projectId = searchParams.get('projectId') || undefined;
+    const scopeParam = searchParams.get('scope');
     const type = searchParams.get('type') || undefined;
     const read = searchParams.get('read');
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
+    const scope =
+      scopeParam === 'organization' || scopeParam === 'project'
+        ? scopeParam
+        : undefined;
 
     // Validate org membership if orgId is provided
     if (orgId) {
@@ -33,6 +38,7 @@ export async function GET(request: NextRequest) {
       userId: session.user.id,
       orgId,
       projectId,
+      scope,
       type: type as import('@prisma/client').AlertType | undefined,
       read: read === 'true' ? true : read === 'false' ? false : undefined,
       limit,

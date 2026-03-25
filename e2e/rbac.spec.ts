@@ -4,6 +4,8 @@ import {
   E2E_GLOBAL_ALERT_TITLE,
   E2E_MEMBER_STORAGE_PATH,
   E2E_ORG_ALERT_TITLE,
+  E2E_PROJECT_ALERT_COUNT,
+  E2E_PROJECT_ALERT_TITLE_PREFIX,
   E2E_ORG_SLUG,
   readRuntimeFixture,
 } from './test-config';
@@ -251,6 +253,7 @@ test.describe('E2E — Admin flows', () => {
     await page.goto(`/organizations/${ORG_SLUG}/alerts`);
     await page.waitForLoadState('load');
     await page.waitForTimeout(1500);
+    await page.locator('select').nth(2).selectOption('organization');
 
     await expect(page.getByText(E2E_ORG_ALERT_TITLE)).toBeVisible({ timeout: 5000 });
     await expect(page.getByText(E2E_GLOBAL_ALERT_TITLE)).not.toBeVisible({ timeout: 3000 });
@@ -287,6 +290,33 @@ test.describe('E2E — Admin flows', () => {
     expect(
       globalUnreadAlerts.some((alert) => alert.title === E2E_GLOBAL_ALERT_TITLE)
     ).toBeTruthy();
+  });
+
+  test('Organization alerts scope filter keeps pagination for project-scoped alerts', async ({ page }) => {
+    await page.goto(`/organizations/${ORG_SLUG}/alerts`);
+    await page.waitForLoadState('load');
+    await page.waitForTimeout(1500);
+
+    await page.locator('select').nth(2).selectOption('project');
+
+    await expect(page.getByText(`Page 1 of ${Math.ceil(E2E_PROJECT_ALERT_COUNT / 20)}`)).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(page.getByText(`${E2E_PROJECT_ALERT_TITLE_PREFIX}22`)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(E2E_ORG_ALERT_TITLE)).not.toBeVisible({ timeout: 3000 });
+
+    await page.getByRole('button', { name: /next/i }).click();
+
+    await expect(page.getByText('Page 2 of 2')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(`${E2E_PROJECT_ALERT_TITLE_PREFIX}01`)).toBeVisible({ timeout: 5000 });
+  });
+
+  test('Organization alerts page shows an error state when the org context cannot load', async ({ page }) => {
+    await page.goto('/organizations/does-not-exist-for-e2e/alerts');
+    await page.waitForLoadState('load');
+
+    await expect(page.getByText(/unable to load organization alerts/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/failed to load organization context/i).first()).toBeVisible({ timeout: 5000 });
   });
 });
 

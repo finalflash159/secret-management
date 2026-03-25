@@ -169,6 +169,7 @@ export default function AlertsPage() {
   const [total, setTotal] = useState(0);
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [userOrgRole, setUserOrgRole] = useState<string | null>(null);
+  const [contextError, setContextError] = useState<string | null>(null);
   const [filters, setFilters] = useState<AlertFilters>({
     type: 'all',
     scope: 'all',
@@ -179,18 +180,47 @@ export default function AlertsPage() {
 
   const fetchOrganizationContext = useCallback(async () => {
     try {
+      setContextError(null);
       const [res, sessionRes] = await Promise.all([
         fetch(`/api/organizations/${slug}`),
         fetch('/api/auth/session'),
       ]);
 
       if (!res.ok) {
+        setAlerts([]);
+        setTotal(0);
+        setOrganizationId(null);
+        setUserOrgRole(null);
+        setContextError('Failed to load organization context');
+        setLoading(false);
+        addToast({
+          title: 'Error',
+          description: 'Failed to load organization context',
+          variant: 'error',
+        });
         return;
       }
 
       const json = await res.json();
       const data = json?.data ?? json;
-      setOrganizationId(data?.id ?? null);
+      const nextOrganizationId = data?.id ?? null;
+
+      if (!nextOrganizationId) {
+        setAlerts([]);
+        setTotal(0);
+        setOrganizationId(null);
+        setUserOrgRole(null);
+        setContextError('Failed to load organization context');
+        setLoading(false);
+        addToast({
+          title: 'Error',
+          description: 'Failed to load organization context',
+          variant: 'error',
+        });
+        return;
+      }
+
+      setOrganizationId(nextOrganizationId);
 
       if (sessionRes.ok) {
         const sessionJson = await sessionRes.json();
@@ -201,6 +231,12 @@ export default function AlertsPage() {
       }
     } catch (err) {
       console.error('Failed to fetch organization context:', err);
+      setAlerts([]);
+      setTotal(0);
+      setOrganizationId(null);
+      setUserOrgRole(null);
+      setContextError('Failed to load organization context');
+      setLoading(false);
       addToast({
         title: 'Error',
         description: 'Failed to load organization context',
@@ -223,11 +259,15 @@ export default function AlertsPage() {
       params.set('orgId', organizationId);
       params.set('limit', String(limit));
       params.set('offset', String(page * limit));
+      if (filters.scope !== 'all') params.set('scope', filters.scope);
       if (filters.type !== 'all') params.set('type', filters.type);
       if (filters.read === 'read') params.set('read', 'true');
       else if (filters.read === 'unread') params.set('read', 'false');
 
       const res = await fetch(`/api/alerts?${params.toString()}`);
+      if (!res.ok) {
+        throw new Error('Failed to load alerts');
+      }
       const json = await res.json();
 
       if (json?.data) {
@@ -321,22 +361,9 @@ export default function AlertsPage() {
   };
 
   const getConfig = (type: AlertType) => alertTypeConfig[type] || alertTypeConfig.info;
-
-  const displayedAlerts = alerts.filter((alert) => {
-    if (filters.scope === 'organization') {
-      return Boolean(alert.orgId) && !alert.projectId;
-    }
-
-    if (filters.scope === 'project') {
-      return Boolean(alert.projectId);
-    }
-
-    return true;
-  });
-
   const unreadCount = alerts.filter((a) => !a.read).length;
-  const displayedTotal = filters.scope === 'all' ? total : displayedAlerts.length;
-  const totalPages = filters.scope === 'all' ? Math.ceil(total / limit) : 1;
+  const displayedTotal = total;
+  const totalPages = Math.ceil(total / limit);
   const isAdmin = userOrgRole === 'owner' || userOrgRole === 'admin';
 
   return (
@@ -429,7 +456,13 @@ export default function AlertsPage() {
             <div className="flex items-center justify-center py-16">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : displayedAlerts.length === 0 ? (
+          ) : contextError ? (
+            <div className="p-8 text-center">
+              <Bell className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+              <p className="text-sm text-foreground">Unable to load organization alerts</p>
+              <p className="text-xs text-muted-foreground mt-1">{contextError}</p>
+            </div>
+          ) : alerts.length === 0 ? (
             <div className="p-8 text-center">
               <Bell className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
               <p className="text-sm text-muted-foreground">No alerts</p>
@@ -439,7 +472,7 @@ export default function AlertsPage() {
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {displayedAlerts.map((alert) => {
+              {alerts.map((alert) => {
                 const config = getConfig(alert.type);
                 const Icon = config.icon;
 

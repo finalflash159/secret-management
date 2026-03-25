@@ -26,6 +26,8 @@ export const E2E_PROJECT_NAME = 'Test Project';
 export const E2E_PROJECT_SLUG = 'test-project';
 export const E2E_ORG_ALERT_TITLE = 'E2E Org Scoped Alert';
 export const E2E_GLOBAL_ALERT_TITLE = 'E2E Global Alert';
+export const E2E_PROJECT_ALERT_TITLE_PREFIX = 'E2E Project Scoped Alert ';
+export const E2E_PROJECT_ALERT_COUNT = 22;
 
 export interface RuntimeFixture {
   organizationId: string;
