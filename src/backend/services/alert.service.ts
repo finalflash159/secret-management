@@ -56,20 +56,10 @@ export const alertService = {
       userId,
     };
 
-    // Filter by scope (user-level, org-level, or project-level)
-    if (orgId) {
-      where.OR = [
-        { orgId },
-        { orgId: null, projectId: null }, // user-level alerts
-      ];
-    }
-
     if (projectId) {
-      where.OR = [
-        { projectId },
-        { projectId: null, orgId: orgId ?? undefined }, // org-level alerts
-        { projectId: null, orgId: null }, // user-level alerts
-      ];
+      where.projectId = projectId;
+    } else if (orgId) {
+      where.orgId = orgId;
     }
 
     if (type) {
@@ -120,10 +110,7 @@ export const alertService = {
 
     // Include alerts scoped to org if provided
     if (orgId) {
-      where.OR = [
-        { orgId },
-        { orgId: null, projectId: null },
-      ];
+      where.orgId = orgId;
     }
 
     return db.alert.count({ where });
@@ -155,10 +142,7 @@ export const alertService = {
     };
 
     if (orgId) {
-      where.OR = [
-        { orgId },
-        { orgId: null, projectId: null },
-      ];
+      where.orgId = orgId;
     }
 
     return db.alert.updateMany({

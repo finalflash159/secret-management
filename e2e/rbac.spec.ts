@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
 import {
   E2E_ADMIN_STORAGE_PATH,
+  E2E_GLOBAL_ALERT_TITLE,
   E2E_MEMBER_STORAGE_PATH,
+  E2E_ORG_ALERT_TITLE,
   E2E_ORG_SLUG,
   readRuntimeFixture,
 } from './test-config';
@@ -241,6 +243,50 @@ test.describe('E2E — Admin flows', () => {
     await expect(
       page.getByRole('button', { name: /add secret/i }).first()
     ).toBeVisible({ timeout: 5000 });
+  });
+
+  test('Organization alerts page stays org-scoped and mark-all uses the organization id', async ({ page }) => {
+    const { organizationId } = readRuntimeFixture();
+
+    await page.goto(`/organizations/${ORG_SLUG}/alerts`);
+    await page.waitForLoadState('load');
+    await page.waitForTimeout(1500);
+
+    await expect(page.getByText(E2E_ORG_ALERT_TITLE)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(E2E_GLOBAL_ALERT_TITLE)).not.toBeVisible({ timeout: 3000 });
+
+    const markAllResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/alerts/mark-read') &&
+        response.request().method() === 'POST' &&
+        response.status() === 200
+    );
+    await page.getByRole('button', { name: /mark all as read/i }).click();
+    await markAllResponse;
+
+    const orgUnreadResponse = await page.request.get(
+      `/api/alerts?orgId=${organizationId}&read=false`
+    );
+    expect(orgUnreadResponse.ok()).toBeTruthy();
+    const orgUnreadJson = await orgUnreadResponse.json();
+    const orgUnreadAlerts = (
+      orgUnreadJson.data?.alerts ?? orgUnreadJson.data ?? orgUnreadJson
+    ) as Array<{ title: string }>;
+
+    expect(
+      orgUnreadAlerts.some((alert) => alert.title === E2E_ORG_ALERT_TITLE)
+    ).toBeFalsy();
+
+    const globalUnreadResponse = await page.request.get('/api/alerts?read=false');
+    expect(globalUnreadResponse.ok()).toBeTruthy();
+    const globalUnreadJson = await globalUnreadResponse.json();
+    const globalUnreadAlerts = (
+      globalUnreadJson.data?.alerts ?? globalUnreadJson.data ?? globalUnreadJson
+    ) as Array<{ title: string }>;
+
+    expect(
+      globalUnreadAlerts.some((alert) => alert.title === E2E_GLOBAL_ALERT_TITLE)
+    ).toBeTruthy();
   });
 });
 
