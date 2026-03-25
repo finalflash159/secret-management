@@ -99,6 +99,8 @@ export default function ProjectSecretsPage() {
   const [showValue, setShowValue] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchQueryRef = useRef('');
+  const selectedSecretIdRef = useRef<string | null>(null);
+  const selectedSecretRequestRef = useRef(0);
 
   // Form states
   const [secretKey, setSecretKey] = useState('');
@@ -122,6 +124,43 @@ export default function ProjectSecretsPage() {
   const [confirmDeleteEnv, setConfirmDeleteEnv] = useState<string | null>(null);
   const [confirmRemoveMember, setConfirmRemoveMember] = useState<string | null>(null);
 
+  const clearSelectedSecret = () => {
+    selectedSecretRequestRef.current += 1;
+    selectedSecretIdRef.current = null;
+    setSelectedSecret(null);
+    setSelectedSecretId(null);
+    setSelectedSecretLoading(false);
+    setShowValue(false);
+  };
+
+  const invalidateCachedSecretValue = (secretId: string) => {
+    setRevealedSecretValues((current) => {
+      if (!(secretId in current)) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[secretId];
+      return next;
+    });
+    setVisibleSecrets((current) => {
+      if (!current.has(secretId)) {
+        return current;
+      }
+
+      const next = new Set(current);
+      next.delete(secretId);
+      return next;
+    });
+
+    if (selectedSecretIdRef.current === secretId) {
+      setSelectedSecret((current) =>
+        current?.id === secretId ? { ...current, value: undefined } : current
+      );
+      setShowValue(false);
+    }
+  };
+
   // Fetch audit logs for selected secret
   useEffect(() => {
     if (selectedSecret) {
@@ -129,6 +168,10 @@ export default function ProjectSecretsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSecret?.id]);
+
+  useEffect(() => {
+    selectedSecretIdRef.current = selectedSecretId;
+  }, [selectedSecretId]);
 
   const fetchAuditLogs = async (secretId: string) => {
     try {
@@ -160,10 +203,7 @@ export default function ProjectSecretsPage() {
     setVisibleSecrets(new Set());
     setRevealedSecretValues({});
     setLoadingSecretIds(new Set());
-    setSelectedSecret(null);
-    setSelectedSecretId(null);
-    setSelectedSecretLoading(false);
-    setShowValue(false);
+    clearSelectedSecret();
   }, [activeEnv, projectId]);
 
   const fetchProjectData = async () => {
@@ -270,9 +310,9 @@ export default function ProjectSecretsPage() {
       if (res.ok) {
         fetchSecrets();
         if (selectedSecret?.id === secretId) {
-          setSelectedSecret(null);
-          setSelectedSecretId(null);
+          clearSelectedSecret();
         }
+        invalidateCachedSecretValue(secretId);
         setConfirmDeleteSecret(null);
       }
     } catch (err) {
@@ -290,7 +330,34 @@ export default function ProjectSecretsPage() {
         body: JSON.stringify({ value: newValue }),
       });
       if (res.ok) {
-        fetchSecrets();
+        invalidateCachedSecretValue(secretId);
+
+        if (selectedSecretIdRef.current === secretId) {
+          const requestId = selectedSecretRequestRef.current + 1;
+          selectedSecretRequestRef.current = requestId;
+          setSelectedSecretLoading(true);
+
+          try {
+            const detail = await fetchSecretDetail(secretId);
+            if (
+              selectedSecretRequestRef.current === requestId &&
+              selectedSecretIdRef.current === secretId
+            ) {
+              setSelectedSecret(detail);
+            }
+          } catch (err) {
+            console.error('Failed to refresh rotated secret detail:', err);
+          } finally {
+            if (
+              selectedSecretRequestRef.current === requestId &&
+              selectedSecretIdRef.current === secretId
+            ) {
+              setSelectedSecretLoading(false);
+            }
+          }
+        }
+
+        await fetchSecrets();
       }
     } catch (err) {
       console.error('Failed to rotate:', err);
@@ -608,6 +675,9 @@ export default function ProjectSecretsPage() {
   }, [activeEnv, canWrite, projectId, secrets, setActions]);
 
   const handleSelectSecret = async (secret: Secret) => {
+    const requestId = selectedSecretRequestRef.current + 1;
+    selectedSecretRequestRef.current = requestId;
+    selectedSecretIdRef.current = secret.id;
     setSelectedSecretId(secret.id);
     setSelectedSecret(secret);
     setSelectedSecretLoading(true);
@@ -615,11 +685,21 @@ export default function ProjectSecretsPage() {
 
     try {
       const detail = await fetchSecretDetail(secret.id);
-      setSelectedSecret(detail);
+      if (
+        selectedSecretRequestRef.current === requestId &&
+        selectedSecretIdRef.current === secret.id
+      ) {
+        setSelectedSecret(detail);
+      }
     } catch (err) {
       console.error('Failed to fetch secret detail:', err);
     } finally {
-      setSelectedSecretLoading(false);
+      if (
+        selectedSecretRequestRef.current === requestId &&
+        selectedSecretIdRef.current === secret.id
+      ) {
+        setSelectedSecretLoading(false);
+      }
     }
   };
 
@@ -989,11 +1069,7 @@ export default function ProjectSecretsPage() {
           <div className="flex items-center justify-between p-4 border-b border-border">
             <span className="text-sm font-bold text-foreground font-mono-secret truncate">{selectedSecret.key}</span>
             <button
-              onClick={() => {
-                setSelectedSecret(null);
-                setSelectedSecretId(null);
-                setShowValue(false);
-              }}
+              onClick={clearSelectedSecret}
               className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
               title="Close"
             >
