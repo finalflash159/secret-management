@@ -18,6 +18,7 @@ export interface AlertFilters {
   userId: string;
   orgId?: string;
   projectId?: string;
+  scope?: 'organization' | 'project';
   type?: AlertType;
   read?: boolean;
   limit?: number;
@@ -50,26 +51,21 @@ export const alertService = {
    * Get alerts for a user with filters
    */
   async getAlerts(filters: AlertFilters) {
-    const { userId, orgId, projectId, type, read, limit = 50, offset = 0 } = filters;
+    const { userId, orgId, projectId, scope, type, read, limit = 50, offset = 0 } = filters;
 
     const where: Record<string, unknown> = {
       userId,
     };
 
-    // Filter by scope (user-level, org-level, or project-level)
-    if (orgId) {
-      where.OR = [
-        { orgId },
-        { orgId: null, projectId: null }, // user-level alerts
-      ];
-    }
-
     if (projectId) {
-      where.OR = [
-        { projectId },
-        { projectId: null, orgId: orgId ?? undefined }, // org-level alerts
-        { projectId: null, orgId: null }, // user-level alerts
-      ];
+      where.projectId = projectId;
+    } else if (orgId) {
+      where.orgId = orgId;
+      if (scope === 'organization') {
+        where.projectId = null;
+      } else if (scope === 'project') {
+        where.projectId = { not: null };
+      }
     }
 
     if (type) {
@@ -120,10 +116,7 @@ export const alertService = {
 
     // Include alerts scoped to org if provided
     if (orgId) {
-      where.OR = [
-        { orgId },
-        { orgId: null, projectId: null },
-      ];
+      where.orgId = orgId;
     }
 
     return db.alert.count({ where });
@@ -155,10 +148,7 @@ export const alertService = {
     };
 
     if (orgId) {
-      where.OR = [
-        { orgId },
-        { orgId: null, projectId: null },
-      ];
+      where.orgId = orgId;
     }
 
     return db.alert.updateMany({

@@ -11,6 +11,10 @@ import {
   E2E_MEMBER_EMAIL,
   E2E_MEMBER_PASSWORD,
   E2E_MEMBER_STORAGE_PATH,
+  E2E_GLOBAL_ALERT_TITLE,
+  E2E_ORG_ALERT_TITLE,
+  E2E_PROJECT_ALERT_COUNT,
+  E2E_PROJECT_ALERT_TITLE_PREFIX,
   E2E_ORG_NAME,
   E2E_ORG_SLUG,
   E2E_PROJECT_NAME,
@@ -319,11 +323,67 @@ async function ensureFixtureData() {
     where: { projectId: project.id },
   });
 
+  await prisma.alert.deleteMany({
+    where: {
+      userId: admin.id,
+      OR: [
+        {
+          title: {
+            in: [E2E_ORG_ALERT_TITLE, E2E_GLOBAL_ALERT_TITLE],
+          },
+        },
+        {
+          title: {
+            startsWith: E2E_PROJECT_ALERT_TITLE_PREFIX,
+          },
+        },
+      ],
+    },
+  });
+
+  await prisma.alert.create({
+    data: {
+      userId: admin.id,
+      orgId: organization.id,
+      type: 'info',
+      title: E2E_ORG_ALERT_TITLE,
+      message: 'Scoped to the organization alerts page',
+      read: false,
+    },
+  });
+
+  await prisma.alert.create({
+    data: {
+      userId: admin.id,
+      type: 'info',
+      title: E2E_GLOBAL_ALERT_TITLE,
+      message: 'Only visible on the global alerts page',
+      read: false,
+    },
+  });
+
+  for (let index = 1; index <= E2E_PROJECT_ALERT_COUNT; index += 1) {
+    const suffix = String(index).padStart(2, '0');
+
+    await prisma.alert.create({
+      data: {
+        userId: admin.id,
+        orgId: organization.id,
+        projectId: project.id,
+        type: 'info',
+        title: `${E2E_PROJECT_ALERT_TITLE_PREFIX}${suffix}`,
+        message: `Project-scoped alert ${suffix}`,
+        read: false,
+      },
+    });
+  }
+
   await fs.mkdir(E2E_RUNTIME_DIR, { recursive: true });
   await fs.writeFile(
     E2E_FIXTURE_PATH,
     JSON.stringify(
       {
+        organizationId: organization.id,
         orgSlug: organization.slug,
         projectId: project.id,
         projectSlug: project.slug,
