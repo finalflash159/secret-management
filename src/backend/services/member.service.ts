@@ -141,8 +141,11 @@ export const memberService = {
       throw new Error('Invalid role');
     }
 
-    const member = await db.projectMember.findUnique({
-      where: { id: memberId },
+    const member = await db.projectMember.findFirst({
+      where: {
+        id: memberId,
+        projectId,
+      },
       include: { user: true },
     });
 
@@ -177,8 +180,11 @@ export const memberService = {
    * Remove a member from a project
    */
   async removeMember(projectId: string, memberId: string, removedByUserId: string) {
-    const member = await db.projectMember.findUnique({
-      where: { id: memberId },
+    const member = await db.projectMember.findFirst({
+      where: {
+        id: memberId,
+        projectId,
+      },
       include: { user: true },
     });
 
