@@ -2,12 +2,13 @@
 
 import { memo, useState, useRef, useMemo, useCallback } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
+import { useHeaderActions } from '@/components/layout/header-actions';
 import {
   ChevronRight,
   Bell,
@@ -35,8 +36,8 @@ interface HeaderProps {
 
 function HeaderComponent({ user, organizationSlug, orgRole, unreadAlerts = 0 }: HeaderProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const { addToast } = useToast();
+  const { actions } = useHeaderActions();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -54,11 +55,11 @@ function HeaderComponent({ user, organizationSlug, orgRole, unreadAlerts = 0 }: 
     setShowImportModal(true);
   }, []);
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         const content = e.target?.result as string;
         // Parse .env file content
         const secrets: Record<string, string> = {};
@@ -71,16 +72,22 @@ function HeaderComponent({ user, organizationSlug, orgRole, unreadAlerts = 0 }: 
           }
         });
 
-        // Store in sessionStorage for the secrets page to pick up
-        sessionStorage.setItem('importedSecrets', JSON.stringify(secrets));
+        if (!actions?.onImportEnv) {
+          addToast({
+            title: 'Import unavailable',
+            description: 'Open a project secrets page to import secrets.',
+            variant: 'error',
+          });
+          return;
+        }
+
+        const importedCount = await actions.onImportEnv(secrets, file.name);
         setShowImportModal(false);
         addToast({
           title: 'Secrets imported',
-          description: `Imported ${Object.keys(secrets).length} secrets from ${file.name}`,
+          description: `Imported ${importedCount} secrets from ${file.name}`,
           variant: 'success',
         });
-        // Navigate to secrets page
-        router.push('/organizations');
       };
       reader.readAsText(file);
     }
@@ -95,10 +102,17 @@ function HeaderComponent({ user, organizationSlug, orgRole, unreadAlerts = 0 }: 
     setShowExportModal(true);
   }, []);
 
-  const handleExport = (format: 'env' | 'json' | 'yaml') => {
-    // Get secrets from sessionStorage (set by the secrets page)
-    const secretsStr = sessionStorage.getItem('exportSecrets');
-    const secrets = secretsStr ? JSON.parse(secretsStr) : {};
+  const handleExport = async (format: 'env' | 'json' | 'yaml') => {
+    if (!actions?.getExportSecrets) {
+      addToast({
+        title: 'Export unavailable',
+        description: 'Open a project secrets page to export secrets.',
+        variant: 'error',
+      });
+      return;
+    }
+
+    const secrets = await actions.getExportSecrets();
 
     let content: string;
     let filename: string;
@@ -143,8 +157,13 @@ function HeaderComponent({ user, organizationSlug, orgRole, unreadAlerts = 0 }: 
 
   // Handle Add Secret
   const handleAddSecretClick = useCallback(() => {
-    router.push('/organizations?addSecret=true');
-  }, [router]);
+    actions?.onAddSecret?.();
+  }, [actions]);
+
+  const canImport = Boolean(actions?.onImportEnv);
+  const canExport = Boolean(actions?.getExportSecrets);
+  const canAddSecret = Boolean(actions?.onAddSecret);
+  const showSecretActions = canImport || canExport || canAddSecret;
 
   return (
     <>
@@ -188,35 +207,37 @@ function HeaderComponent({ user, organizationSlug, orgRole, unreadAlerts = 0 }: 
 
         {/* Right Actions */}
         <div className="flex items-center gap-2">
-          {/* Only show these actions when org is selected */}
-          {organizationSlug && (
+          {showSecretActions && (
             <>
-              {/* Import .env */}
-              <button
-                onClick={handleImportClick}
-                className="flex items-center gap-1.5 rounded-md border border-border bg-transparent px-3 py-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <Upload className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Import .env</span>
-              </button>
+              {canImport && (
+                <button
+                  onClick={handleImportClick}
+                  className="flex items-center gap-1.5 rounded-md border border-border bg-transparent px-3 py-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Import .env</span>
+                </button>
+              )}
 
-              {/* Export */}
-              <button
-                onClick={handleExportClick}
-                className="flex items-center gap-1.5 rounded-md border border-border bg-transparent px-3 py-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <Download className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Export</span>
-              </button>
+              {canExport && (
+                <button
+                  onClick={handleExportClick}
+                  className="flex items-center gap-1.5 rounded-md border border-border bg-transparent px-3 py-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Export</span>
+                </button>
+              )}
 
-              {/* Add Secret */}
-              <button
-                onClick={handleAddSecretClick}
-                className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:opacity-90"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Add Secret</span>
-              </button>
+              {canAddSecret && (
+                <button
+                  onClick={handleAddSecretClick}
+                  className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:opacity-90"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Add Secret</span>
+                </button>
+              )}
 
               {/* Divider */}
               <div className="h-5 w-px bg-border mx-1" />

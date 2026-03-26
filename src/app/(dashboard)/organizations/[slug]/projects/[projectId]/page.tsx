@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { useHeaderActions } from '@/components/layout/header-actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -43,9 +44,10 @@ interface Folder {
 interface Secret {
   id: string;
   key: string;
-  value: string;
+  value?: string;
   envId: string;
   folderId: string;
+  projectId?: string;
   folder?: Folder;
   version: number;
   expiresAt: string | null;
@@ -67,6 +69,7 @@ interface AuditEntry {
 export default function ProjectSecretsPage() {
   const params = useParams();
   const router = useRouter();
+  const { setActions } = useHeaderActions();
   const projectId = params.projectId as string;
   const slug = params.slug as string;
 
@@ -87,11 +90,17 @@ export default function ProjectSecretsPage() {
   const [searchResults, setSearchResults] = useState<{id: string; email: string; name: string | null}[]>([]);
   const [searchingMembers, setSearchingMembers] = useState(false);
   const [selectedSecret, setSelectedSecret] = useState<Secret | null>(null);
+  const [selectedSecretId, setSelectedSecretId] = useState<string | null>(null);
+  const [selectedSecretLoading, setSelectedSecretLoading] = useState(false);
   const [visibleSecrets, setVisibleSecrets] = useState<Set<string>>(new Set());
+  const [revealedSecretValues, setRevealedSecretValues] = useState<Record<string, string>>({});
+  const [loadingSecretIds, setLoadingSecretIds] = useState<Set<string>>(new Set());
   const [copiedSecret, setCopiedSecret] = useState<string | null>(null);
   const [showValue, setShowValue] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchQueryRef = useRef('');
+  const selectedSecretIdRef = useRef<string | null>(null);
+  const selectedSecretRequestRef = useRef(0);
 
   // Form states
   const [secretKey, setSecretKey] = useState('');
@@ -115,6 +124,43 @@ export default function ProjectSecretsPage() {
   const [confirmDeleteEnv, setConfirmDeleteEnv] = useState<string | null>(null);
   const [confirmRemoveMember, setConfirmRemoveMember] = useState<string | null>(null);
 
+  const clearSelectedSecret = () => {
+    selectedSecretRequestRef.current += 1;
+    selectedSecretIdRef.current = null;
+    setSelectedSecret(null);
+    setSelectedSecretId(null);
+    setSelectedSecretLoading(false);
+    setShowValue(false);
+  };
+
+  const invalidateCachedSecretValue = (secretId: string) => {
+    setRevealedSecretValues((current) => {
+      if (!(secretId in current)) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[secretId];
+      return next;
+    });
+    setVisibleSecrets((current) => {
+      if (!current.has(secretId)) {
+        return current;
+      }
+
+      const next = new Set(current);
+      next.delete(secretId);
+      return next;
+    });
+
+    if (selectedSecretIdRef.current === secretId) {
+      setSelectedSecret((current) =>
+        current?.id === secretId ? { ...current, value: undefined } : current
+      );
+      setShowValue(false);
+    }
+  };
+
   // Fetch audit logs for selected secret
   useEffect(() => {
     if (selectedSecret) {
@@ -122,6 +168,10 @@ export default function ProjectSecretsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSecret?.id]);
+
+  useEffect(() => {
+    selectedSecretIdRef.current = selectedSecretId;
+  }, [selectedSecretId]);
 
   const fetchAuditLogs = async (secretId: string) => {
     try {
@@ -149,42 +199,12 @@ export default function ProjectSecretsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEnv]);
 
-  // Handle imported secrets from header
   useEffect(() => {
-    const importSecrets = async () => {
-      const imported = sessionStorage.getItem('importedSecrets');
-      if (imported && activeEnv) {
-        const secrets = JSON.parse(imported);
-        // Create secrets one by one
-        for (const [key, value] of Object.entries(secrets)) {
-          try {
-            await fetch(`/api/projects/${projectId}/secrets`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ key, value, envId: activeEnv }),
-            });
-          } catch (err) {
-            console.error('Failed to import secret:', key, err);
-          }
-        }
-        sessionStorage.removeItem('importedSecrets');
-        fetchSecrets();
-      }
-    };
-    importSecrets();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setVisibleSecrets(new Set());
+    setRevealedSecretValues({});
+    setLoadingSecretIds(new Set());
+    clearSelectedSecret();
   }, [activeEnv, projectId]);
-
-  // Set up secrets for export
-  useEffect(() => {
-    if (secrets.length > 0) {
-      const exportData: Record<string, string> = {};
-      secrets.forEach(s => {
-        exportData[s.key] = s.value;
-      });
-      sessionStorage.setItem('exportSecrets', JSON.stringify(exportData));
-    }
-  }, [secrets]);
 
   const fetchProjectData = async () => {
     try {
@@ -230,8 +250,7 @@ export default function ProjectSecretsPage() {
 
   const fetchSecrets = async () => {
     try {
-      // Add decrypt=true to get decrypted values for the secrets list
-      const res = await fetch(`/api/projects/${projectId}/secrets?envId=${activeEnv}&decrypt=true`);
+      const res = await fetch(`/api/projects/${projectId}/secrets?envId=${activeEnv}`);
       if (res.ok) {
         const json = await res.json();
         // Handle paginated response format
@@ -241,6 +260,16 @@ export default function ProjectSecretsPage() {
     } catch (err) {
       console.error('Failed to fetch secrets:', err);
     }
+  };
+
+  const fetchSecretDetail = async (secretId: string) => {
+    const res = await fetch(`/api/secrets/${secretId}`);
+    if (!res.ok) {
+      throw new Error('Failed to fetch secret detail');
+    }
+
+    const json = await res.json();
+    return (json?.data ?? json) as Secret;
   };
 
   const handleCreateSecret = async (e: React.FormEvent) => {
@@ -281,8 +310,9 @@ export default function ProjectSecretsPage() {
       if (res.ok) {
         fetchSecrets();
         if (selectedSecret?.id === secretId) {
-          setSelectedSecret(null);
+          clearSelectedSecret();
         }
+        invalidateCachedSecretValue(secretId);
         setConfirmDeleteSecret(null);
       }
     } catch (err) {
@@ -300,7 +330,34 @@ export default function ProjectSecretsPage() {
         body: JSON.stringify({ value: newValue }),
       });
       if (res.ok) {
-        fetchSecrets();
+        invalidateCachedSecretValue(secretId);
+
+        if (selectedSecretIdRef.current === secretId) {
+          const requestId = selectedSecretRequestRef.current + 1;
+          selectedSecretRequestRef.current = requestId;
+          setSelectedSecretLoading(true);
+
+          try {
+            const detail = await fetchSecretDetail(secretId);
+            if (
+              selectedSecretRequestRef.current === requestId &&
+              selectedSecretIdRef.current === secretId
+            ) {
+              setSelectedSecret(detail);
+            }
+          } catch (err) {
+            console.error('Failed to refresh rotated secret detail:', err);
+          } finally {
+            if (
+              selectedSecretRequestRef.current === requestId &&
+              selectedSecretIdRef.current === secretId
+            ) {
+              setSelectedSecretLoading(false);
+            }
+          }
+        }
+
+        await fetchSecrets();
       }
     } catch (err) {
       console.error('Failed to rotate:', err);
@@ -518,23 +575,6 @@ export default function ProjectSecretsPage() {
     }
   };
 
-  const toggleSecretVisibility = (secretId: string) => {
-    const newVisible = new Set(visibleSecrets);
-    if (newVisible.has(secretId)) newVisible.delete(secretId);
-    else newVisible.add(secretId);
-    setVisibleSecrets(newVisible);
-  };
-
-  const copyToClipboard = async (secret: Secret) => {
-    try {
-      await navigator.clipboard.writeText(secret.value);
-      setCopiedSecret(secret.id);
-      setTimeout(() => setCopiedSecret(null), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
-
   const getEnvDot = (envSlug: string) => {
     const s = envSlug.toLowerCase();
     if (s === 'prod' || s === 'production') return 'bg-prod';
@@ -567,6 +607,160 @@ export default function ProjectSecretsPage() {
   const canManageSettings = userPermissions.includes('settings:manage');
   const canRotate = canWrite; // rotating regenerates value = write operation
 
+  const openAddSecretModal = () => {
+    setSecretKey('');
+    setSecretValue('');
+    setSecretExpiresAt('');
+    setShowValue(false);
+    setShowSecretModal(true);
+  };
+
+  const handleImportSecretsFromHeader = async (
+    importedSecrets: Record<string, string>
+  ) => {
+    if (!activeEnv || !canWrite) return 0;
+
+    let importedCount = 0;
+
+    for (const [key, value] of Object.entries(importedSecrets)) {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/secrets`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, value, envId: activeEnv }),
+        });
+
+        if (res.ok) {
+          importedCount += 1;
+        }
+      } catch (err) {
+        console.error('Failed to import secret:', key, err);
+      }
+    }
+
+    await fetchSecrets();
+    return importedCount;
+  };
+
+  const getExportSecretsForHeader = async () => {
+    const exportData: Record<string, string> = {};
+
+    const secretEntries = await Promise.all(
+      secrets.map(async (secret) => {
+        const detail = await fetchSecretDetail(secret.id);
+        return [secret.key, detail.value || ''] as const;
+      })
+    );
+
+    secretEntries.forEach(([key, value]) => {
+      exportData[key] = value;
+    });
+
+    return exportData;
+  };
+
+  useEffect(() => {
+    setActions({
+      onImportEnv:
+        canWrite && activeEnv ? handleImportSecretsFromHeader : undefined,
+      getExportSecrets:
+        activeEnv ? getExportSecretsForHeader : undefined,
+      onAddSecret: canWrite ? openAddSecretModal : undefined,
+    });
+
+    return () => {
+      setActions(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEnv, canWrite, projectId, secrets, setActions]);
+
+  const handleSelectSecret = async (secret: Secret) => {
+    const requestId = selectedSecretRequestRef.current + 1;
+    selectedSecretRequestRef.current = requestId;
+    selectedSecretIdRef.current = secret.id;
+    setSelectedSecretId(secret.id);
+    setSelectedSecret(secret);
+    setSelectedSecretLoading(true);
+    setShowValue(false);
+
+    try {
+      const detail = await fetchSecretDetail(secret.id);
+      if (
+        selectedSecretRequestRef.current === requestId &&
+        selectedSecretIdRef.current === secret.id
+      ) {
+        setSelectedSecret(detail);
+      }
+    } catch (err) {
+      console.error('Failed to fetch secret detail:', err);
+    } finally {
+      if (
+        selectedSecretRequestRef.current === requestId &&
+        selectedSecretIdRef.current === secret.id
+      ) {
+        setSelectedSecretLoading(false);
+      }
+    }
+  };
+
+  const toggleSecretVisibility = async (secretId: string) => {
+    if (visibleSecrets.has(secretId)) {
+      const newVisible = new Set(visibleSecrets);
+      newVisible.delete(secretId);
+      setVisibleSecrets(newVisible);
+      setRevealedSecretValues((current) => {
+        const next = { ...current };
+        delete next[secretId];
+        return next;
+      });
+      return;
+    }
+
+    const newLoading = new Set(loadingSecretIds);
+    newLoading.add(secretId);
+    setLoadingSecretIds(newLoading);
+
+    try {
+      const detail = await fetchSecretDetail(secretId);
+      setRevealedSecretValues((current) => ({
+        ...current,
+        [secretId]: detail.value || '',
+      }));
+      setVisibleSecrets((current) => {
+        const next = new Set(current);
+        next.add(secretId);
+        return next;
+      });
+    } catch (err) {
+      console.error('Failed to reveal secret:', err);
+    } finally {
+      setLoadingSecretIds((current) => {
+        const next = new Set(current);
+        next.delete(secretId);
+        return next;
+      });
+    }
+  };
+
+  const copyToClipboard = async (secret: Secret) => {
+    try {
+      const value =
+        revealedSecretValues[secret.id] ||
+        (selectedSecret?.id === secret.id ? selectedSecret.value : undefined) ||
+        (await fetchSecretDetail(secret.id)).value;
+
+      if (!value) {
+        return;
+      }
+
+      await navigator.clipboard.writeText(value);
+      setCopiedSecret(secret.id);
+      setTimeout(() => setCopiedSecret(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
   // Mock audit data for selected secret
   if (loading) {
     return (
@@ -582,7 +776,7 @@ export default function ProjectSecretsPage() {
   return (
     <div className="flex h-full">
       {/* Main Content */}
-      <div className={`flex-1 min-w-0 flex flex-col overflow-hidden ${selectedSecret ? 'pr-2' : ''}`}>
+      <div className={`flex-1 min-w-0 flex flex-col overflow-hidden ${selectedSecretId ? 'pr-2' : ''}`}>
         {/* Header */}
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -607,7 +801,7 @@ export default function ProjectSecretsPage() {
               </Button>
             )}
             {canWrite && (
-              <Button size="sm" onClick={() => { setSecretKey(''); setSecretValue(''); setSecretExpiresAt(''); setShowSecretModal(true); }}>
+              <Button size="sm" onClick={openAddSecretModal}>
                 <Plus className="h-4 w-4 mr-1" />
                 Add Secret
               </Button>
@@ -716,7 +910,7 @@ export default function ProjectSecretsPage() {
               <h3 className="text-sm font-semibold text-foreground">No secrets</h3>
               <p className="mt-1 text-xs text-muted-foreground">Add your first secret</p>
               {canWrite && (
-                <Button size="sm" className="mt-4" onClick={() => { setSecretKey(''); setSecretValue(''); setSecretExpiresAt(''); setShowSecretModal(true); }}>
+                <Button size="sm" className="mt-4" onClick={openAddSecretModal}>
                   <Plus className="h-4 w-4 mr-1" />
                   Add Secret
                 </Button>
@@ -746,13 +940,13 @@ export default function ProjectSecretsPage() {
                 <div
                   key={secret.id}
                   className={`grid grid-cols-[28px_3fr_2fr_1fr_1fr_1fr_80px] items-center px-4 h-11 cursor-pointer transition-colors hover:bg-muted/50 overflow-hidden ${
-                    selectedSecret?.id === secret.id ? 'bg-gold/5 border-l-2 border-l-gold' : ''
+                    selectedSecretId === secret.id ? 'bg-gold/5 border-l-2 border-l-gold' : ''
                   }`}
-                  onClick={() => setSelectedSecret(secret)}
+                  onClick={() => handleSelectSecret(secret)}
                 >
                   {/* Checkbox */}
-                  <div className={`w-4 h-4 rounded border shrink-0 ${selectedSecret?.id === secret.id ? 'bg-primary border-primary' : 'border-border'}`}>
-                    {selectedSecret?.id === secret.id && (
+                  <div className={`w-4 h-4 rounded border shrink-0 ${selectedSecretId === secret.id ? 'bg-primary border-primary' : 'border-border'}`}>
+                    {selectedSecretId === secret.id && (
                       <Check className="h-3 w-3 text-primary-foreground" />
                     )}
                   </div>
@@ -766,7 +960,11 @@ export default function ProjectSecretsPage() {
                   {/* Value */}
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="font-mono-secret text-muted-foreground truncate min-w-0">
-                      {visibleSecrets.has(secret.id) ? secret.value : '••••••••••••••••••••'}
+                      {visibleSecrets.has(secret.id)
+                        ? (revealedSecretValues[secret.id] || 'Loading secret value...')
+                        : loadingSecretIds.has(secret.id)
+                        ? 'Loading secret value...'
+                        : '••••••••••••••••••••'}
                     </span>
                     <div className="flex items-center gap-0.5 shrink-0">
                       <button
@@ -852,7 +1050,7 @@ export default function ProjectSecretsPage() {
             {canWrite && (
               <div
                 className="flex items-center gap-2 px-4 py-2.5 border-t border-dashed border-border cursor-pointer hover:bg-muted/50 transition-colors"
-                onClick={() => { setSecretKey(''); setSecretValue(''); setSecretExpiresAt(''); setShowSecretModal(true); }}
+                onClick={openAddSecretModal}
               >
                 <div className="w-5 h-5 rounded border border-dashed border-border flex items-center justify-center text-muted-foreground">
                   <Plus className="h-3 w-3" />
@@ -865,13 +1063,13 @@ export default function ProjectSecretsPage() {
       </div>
 
       {/* Right Panel - Secret Detail */}
-      {selectedSecret && (
+      {selectedSecretId && selectedSecret && (
         <div className="w-[300px] border border-border bg-card flex flex-col overflow-hidden animate-slideInRight rounded-lg ml-2">
           {/* Panel Header */}
           <div className="flex items-center justify-between p-4 border-b border-border">
             <span className="text-sm font-bold text-foreground font-mono-secret truncate">{selectedSecret.key}</span>
             <button
-              onClick={() => setSelectedSecret(null)}
+              onClick={clearSelectedSecret}
               className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
               title="Close"
             >
@@ -886,7 +1084,9 @@ export default function ProjectSecretsPage() {
               <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Value</p>
               <div className="rounded-lg border border-border bg-muted/50 p-3 mb-2">
                 <p className="font-mono-secret text-sm text-foreground break-all">
-                  {showValue ? selectedSecret.value : '••••••••••••••••••••'}
+                  {showValue
+                    ? selectedSecret.value || 'Loading secret value...'
+                    : '••••••••••••••••••••'}
                 </p>
               </div>
               <Button
@@ -894,9 +1094,14 @@ export default function ProjectSecretsPage() {
                 size="sm"
                 className="w-full justify-center"
                 onClick={() => setShowValue(!showValue)}
+                disabled={selectedSecretLoading && !selectedSecret.value}
               >
                 {showValue ? <EyeOff className="h-4 w-4 mr-1" /> : <Eye className="h-4 w-4 mr-1" />}
-                {showValue ? 'Hide value' : 'Reveal value'}
+                {selectedSecretLoading && !selectedSecret.value
+                  ? 'Loading value...'
+                  : showValue
+                  ? 'Hide value'
+                  : 'Reveal value'}
               </Button>
             </div>
 

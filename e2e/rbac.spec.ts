@@ -244,8 +244,7 @@ test.describe('E2E — Admin flows', () => {
     await expect(page.getByText(projectName).first()).toBeVisible({ timeout: 8000 });
   });
 
-  test('Admin can see Add Secret button on project page', async ({ page }) => {
-    // Admin should be able to see the Add Secret button on their project
+  test('Admin can open Add Secret from the header on project page', async ({ page }) => {
     await page.goto(`/organizations/${ORG_SLUG}/projects/${getProjectId()}`);
     await page.waitForLoadState('load');
     await page.waitForTimeout(2000);
@@ -254,9 +253,14 @@ test.describe('E2E — Admin flows', () => {
     await expect(page.getByText(/404/i)).not.toBeVisible({ timeout: 3000 });
     await expect(page.getByText(/access restricted/i)).not.toBeVisible({ timeout: 3000 });
 
-    // Add Secret button should be visible for project admin/owner
+    const headerAddSecretButton = page
+      .getByRole('banner')
+      .getByRole('button', { name: /^add secret$/i });
+
+    await expect(headerAddSecretButton).toBeVisible({ timeout: 5000 });
+    await headerAddSecretButton.click();
     await expect(
-      page.getByRole('button', { name: /add secret/i }).first()
+      page.getByRole('heading', { name: /new secret/i })
     ).toBeVisible({ timeout: 5000 });
   });
 
@@ -370,6 +374,75 @@ test.describe('E2E — Admin flows', () => {
     expect(
       environments.some((environment) => environment.id === createdEnvironment.id)
     ).toBeFalsy();
+  });
+
+  test('Secret list stays metadata-only and avoids sessionStorage transport', async ({ page }) => {
+    const projectId = getProjectId();
+    let createdSecretId: string | null = null;
+
+    const environmentsResponse = await page.request.get(
+      `/api/projects/${projectId}/environments`
+    );
+    expect(environmentsResponse.ok()).toBeTruthy();
+    const environmentsJson = await environmentsResponse.json();
+    const environments = (environmentsJson.data ?? environmentsJson) as Array<{
+      id: string;
+    }>;
+    const envId = environments[0]?.id;
+
+    expect(envId).toBeTruthy();
+
+    try {
+      const key = `E2E_SECRET_${Date.now().toString().slice(-6)}`;
+      const value = `value-${Date.now()}`;
+
+      const createResponse = await page.request.post(
+        `/api/projects/${projectId}/secrets`,
+        {
+          data: { key, value, envId },
+        }
+      );
+      expect(createResponse.status()).toBe(201);
+      const createJson = await createResponse.json();
+      const createdSecret = (createJson.data ?? createJson) as {
+        id: string;
+      };
+      createdSecretId = createdSecret.id;
+
+      const listResponse = await page.request.get(
+        `/api/projects/${projectId}/secrets?envId=${envId}`
+      );
+      expect(listResponse.ok()).toBeTruthy();
+      const listJson = await listResponse.json();
+      const listedSecrets = (
+        listJson.data?.data ?? listJson.data ?? listJson
+      ) as Array<Record<string, unknown> & { id: string }>;
+      const listedSecret = listedSecrets.find(
+        (secret) => secret.id === createdSecretId
+      );
+
+      expect(listedSecret).toBeTruthy();
+      expect(listedSecret).not.toHaveProperty('value');
+
+      await page.goto(`/organizations/${ORG_SLUG}/projects/${projectId}`);
+      await page.waitForLoadState('load');
+      await page.waitForTimeout(2000);
+
+      const storageState = await page.evaluate(() => ({
+        importedSecrets: sessionStorage.getItem('importedSecrets'),
+        exportSecrets: sessionStorage.getItem('exportSecrets'),
+      }));
+
+      expect(storageState.importedSecrets).toBeNull();
+      expect(storageState.exportSecrets).toBeNull();
+    } finally {
+      if (createdSecretId) {
+        const deleteResponse = await page.request.delete(
+          `/api/secrets/${createdSecretId}`
+        );
+        expect(deleteResponse.ok()).toBeTruthy();
+      }
+    }
   });
 });
 

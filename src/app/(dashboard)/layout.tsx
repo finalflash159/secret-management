@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useSession } from '@/components/session-provider';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
+import { HeaderActionsProvider } from '@/components/layout/header-actions';
 
 type OrgRole = 'owner' | 'admin' | 'member';
 
@@ -117,16 +118,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           />
         </div>
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-          <Header
-            user={user}
-            sidebarCollapsed={false}
-            organizationSlug={currentOrgSlug}
-            orgRole={orgRole}
-            unreadAlerts={unreadAlerts}
-          />
-          <main className="flex-1 overflow-hidden">
-            <div className="h-full overflow-y-auto p-6">{children}</div>
-          </main>
+          <HeaderActionsProvider>
+            <Header
+              user={user}
+              sidebarCollapsed={false}
+              organizationSlug={currentOrgSlug}
+              orgRole={orgRole}
+              unreadAlerts={unreadAlerts}
+            />
+            <main className="flex-1 overflow-hidden">
+              <div className="h-full overflow-y-auto p-6">{children}</div>
+            </main>
+          </HeaderActionsProvider>
         </div>
       </div>
     </div>
