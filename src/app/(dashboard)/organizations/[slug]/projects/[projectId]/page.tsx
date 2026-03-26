@@ -12,6 +12,7 @@ import { Modal } from '@/components/ui/modal';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Badge } from '@/components/ui/badge';
 import { Combobox } from '@/components/ui/combobox';
+import { useToast } from '@/components/ui/toast';
 import {
   Eye,
   EyeOff,
@@ -66,10 +67,19 @@ interface AuditEntry {
   timestamp: string;
 }
 
+type SecretVisibilityFilter = 'all' | 'hidden' | 'revealed' | 'expiring' | 'expired';
+type SecretSortOption =
+  | 'updated-desc'
+  | 'updated-asc'
+  | 'key-asc'
+  | 'key-desc'
+  | 'expires-soon';
+
 export default function ProjectSecretsPage() {
   const params = useParams();
   const router = useRouter();
   const { setActions } = useHeaderActions();
+  const { addToast } = useToast();
   const projectId = params.projectId as string;
   const slug = params.slug as string;
 
@@ -98,9 +108,13 @@ export default function ProjectSecretsPage() {
   const [copiedSecret, setCopiedSecret] = useState<string | null>(null);
   const [showValue, setShowValue] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [visibilityFilter, setVisibilityFilter] =
+    useState<SecretVisibilityFilter>('all');
+  const [sortBy, setSortBy] = useState<SecretSortOption>('updated-desc');
   const searchQueryRef = useRef('');
   const selectedSecretIdRef = useRef<string | null>(null);
   const selectedSecretRequestRef = useRef(0);
+  const [revealAllLoading, setRevealAllLoading] = useState(false);
 
   // Form states
   const [secretKey, setSecretKey] = useState('');
@@ -294,9 +308,19 @@ export default function ProjectSecretsPage() {
       setSecretKey('');
       setSecretValue('');
       setSecretExpiresAt('');
+      addToast({
+        title: 'Secret created',
+        description: `${secretKey} was added to ${activeEnvData?.name || 'the current environment'}.`,
+        variant: 'success',
+      });
       fetchSecrets();
     } catch {
       setError('An error occurred');
+      addToast({
+        title: 'Create failed',
+        description: 'Unable to create the secret right now.',
+        variant: 'error',
+      });
     } finally {
       setCreating(false);
     }
@@ -314,9 +338,18 @@ export default function ProjectSecretsPage() {
         }
         invalidateCachedSecretValue(secretId);
         setConfirmDeleteSecret(null);
+        addToast({
+          title: 'Secret deleted',
+          variant: 'success',
+        });
       }
     } catch (err) {
       console.error('Failed to delete:', err);
+      addToast({
+        title: 'Delete failed',
+        description: 'Unable to delete the secret.',
+        variant: 'error',
+      });
     }
   };
 
@@ -358,9 +391,19 @@ export default function ProjectSecretsPage() {
         }
 
         await fetchSecrets();
+        addToast({
+          title: 'Secret rotated',
+          description: 'Reveal the secret again to view its new value.',
+          variant: 'success',
+        });
       }
     } catch (err) {
       console.error('Failed to rotate:', err);
+      addToast({
+        title: 'Rotation failed',
+        description: 'Unable to rotate the secret right now.',
+        variant: 'error',
+      });
     }
   };
 
@@ -591,7 +634,90 @@ export default function ProjectSecretsPage() {
     return 'env-test';
   };
 
-  const filteredSecrets = secrets.filter(s => s.envId === activeEnv && s.key.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredSecrets = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const now = new Date();
+
+    return secrets.filter((secret) => {
+      if (secret.envId !== activeEnv) {
+        return false;
+      }
+
+      const folderName = secret.folder?.name?.toLowerCase() ?? '';
+      const matchesSearch =
+        normalizedQuery.length === 0 ||
+        secret.key.toLowerCase().includes(normalizedQuery) ||
+        folderName.includes(normalizedQuery);
+
+      if (!matchesSearch) {
+        return false;
+      }
+
+      switch (visibilityFilter) {
+        case 'hidden':
+          return !visibleSecrets.has(secret.id);
+        case 'revealed':
+          return visibleSecrets.has(secret.id);
+        case 'expired':
+          return Boolean(
+            secret.expiresAt && new Date(secret.expiresAt).getTime() < now.getTime()
+          );
+        case 'expiring':
+          if (!secret.expiresAt) {
+            return false;
+          }
+          const expiresAt = new Date(secret.expiresAt).getTime();
+          const daysUntilExpiry =
+            (expiresAt - now.getTime()) / (1000 * 60 * 60 * 24);
+          return daysUntilExpiry >= 0 && daysUntilExpiry <= 30;
+        default:
+          return true;
+      }
+    });
+  }, [activeEnv, searchQuery, secrets, visibilityFilter, visibleSecrets]);
+
+  const sortedSecrets = useMemo(() => {
+    const next = [...filteredSecrets];
+
+    next.sort((left, right) => {
+      switch (sortBy) {
+        case 'updated-asc':
+          return (
+            new Date(left.updatedAt).getTime() - new Date(right.updatedAt).getTime()
+          );
+        case 'key-asc':
+          return left.key.localeCompare(right.key);
+        case 'key-desc':
+          return right.key.localeCompare(left.key);
+        case 'expires-soon': {
+          const leftExpiry = left.expiresAt
+            ? new Date(left.expiresAt).getTime()
+            : Number.POSITIVE_INFINITY;
+          const rightExpiry = right.expiresAt
+            ? new Date(right.expiresAt).getTime()
+            : Number.POSITIVE_INFINITY;
+          return leftExpiry - rightExpiry;
+        }
+        case 'updated-desc':
+        default:
+          return (
+            new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+          );
+      }
+    });
+
+    return next;
+  }, [filteredSecrets, sortBy]);
+
+  const filteredSecretIds = useMemo(
+    () => sortedSecrets.map((secret) => secret.id),
+    [sortedSecrets]
+  );
+
+  const allFilteredSecretsRevealed =
+    filteredSecretIds.length > 0 &&
+    filteredSecretIds.every((secretId) => visibleSecrets.has(secretId));
+
   const activeEnvData = environments.find(e => e.id === activeEnv);
 
   // Compute user permissions from project membership
@@ -742,6 +868,75 @@ export default function ProjectSecretsPage() {
     }
   };
 
+  const handleToggleRevealAll = async () => {
+    if (filteredSecretIds.length === 0 || revealAllLoading) {
+      return;
+    }
+
+    if (allFilteredSecretsRevealed) {
+      setVisibleSecrets((current) => {
+        const next = new Set(current);
+        filteredSecretIds.forEach((secretId) => next.delete(secretId));
+        return next;
+      });
+      setRevealedSecretValues((current) => {
+        const next = { ...current };
+        filteredSecretIds.forEach((secretId) => {
+          delete next[secretId];
+        });
+        return next;
+      });
+      addToast({
+        title: 'Values hidden',
+        description: 'Filtered secrets were hidden again.',
+        variant: 'success',
+      });
+      return;
+    }
+
+    const hiddenSecretIds = filteredSecretIds.filter(
+      (secretId) => !visibleSecrets.has(secretId)
+    );
+
+    setRevealAllLoading(true);
+    try {
+      const details = await Promise.all(
+        hiddenSecretIds.map(async (secretId) => {
+          const detail = await fetchSecretDetail(secretId);
+          return [secretId, detail.value || ''] as const;
+        })
+      );
+
+      setRevealedSecretValues((current) => {
+        const next = { ...current };
+        details.forEach(([secretId, value]) => {
+          next[secretId] = value;
+        });
+        return next;
+      });
+      setVisibleSecrets((current) => {
+        const next = new Set(current);
+        filteredSecretIds.forEach((secretId) => next.add(secretId));
+        return next;
+      });
+
+      addToast({
+        title: 'Values revealed',
+        description: `Revealed ${filteredSecretIds.length} filtered secrets.`,
+        variant: 'success',
+      });
+    } catch (err) {
+      console.error('Failed to reveal filtered secrets:', err);
+      addToast({
+        title: 'Reveal failed',
+        description: 'Unable to reveal every filtered secret.',
+        variant: 'error',
+      });
+    } finally {
+      setRevealAllLoading(false);
+    }
+  };
+
   const copyToClipboard = async (secret: Secret) => {
     try {
       const value =
@@ -756,10 +951,30 @@ export default function ProjectSecretsPage() {
       await navigator.clipboard.writeText(value);
       setCopiedSecret(secret.id);
       setTimeout(() => setCopiedSecret(null), 2000);
+      addToast({
+        title: 'Copied',
+        description: `${secret.key} was copied to your clipboard.`,
+        variant: 'success',
+      });
     } catch (err) {
       console.error('Failed to copy:', err);
+      addToast({
+        title: 'Copy failed',
+        description: 'Unable to copy this secret.',
+        variant: 'error',
+      });
     }
   };
+
+  useEffect(() => {
+    if (
+      selectedSecretId &&
+      !sortedSecrets.some((secret) => secret.id === selectedSecretId)
+    ) {
+      clearSelectedSecret();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortedSecrets, selectedSecretId]);
 
   // Mock audit data for selected secret
   if (loading) {
@@ -832,6 +1047,7 @@ export default function ProjectSecretsPage() {
           <div className="relative flex-1 max-w-[320px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
+              data-testid="secret-search"
               type="text"
               placeholder="Search secrets..."
               value={searchQuery}
@@ -839,22 +1055,50 @@ export default function ProjectSecretsPage() {
               className="w-full h-8 rounded-lg border border-border bg-card pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring"
             />
           </div>
-          <Button variant="outline" size="sm">
-            <svg className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
-            </svg>
-            Filter
-          </Button>
-          <Button variant="outline" size="sm">
-            <svg className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-            </svg>
-            Sort
-          </Button>
+          <select
+            data-testid="secret-filter"
+            aria-label="Filter secrets"
+            value={visibilityFilter}
+            onChange={(event) =>
+              setVisibilityFilter(event.target.value as SecretVisibilityFilter)
+            }
+            className="h-8 rounded-lg border border-border bg-card px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+          >
+            <option value="all">All secrets</option>
+            <option value="hidden">Hidden only</option>
+            <option value="revealed">Revealed only</option>
+            <option value="expiring">Expiring soon</option>
+            <option value="expired">Expired</option>
+          </select>
+          <select
+            data-testid="secret-sort"
+            aria-label="Sort secrets"
+            value={sortBy}
+            onChange={(event) =>
+              setSortBy(event.target.value as SecretSortOption)
+            }
+            className="h-8 rounded-lg border border-border bg-card px-3 text-sm text-foreground focus:outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+          >
+            <option value="updated-desc">Newest updated</option>
+            <option value="updated-asc">Oldest updated</option>
+            <option value="key-asc">Key A-Z</option>
+            <option value="key-desc">Key Z-A</option>
+            <option value="expires-soon">Expires soonest</option>
+          </select>
           <div className="ml-auto">
-            <Button variant="ghost" size="sm">
+            <Button
+              data-testid="reveal-all-secrets"
+              variant="ghost"
+              size="sm"
+              onClick={handleToggleRevealAll}
+              disabled={sortedSecrets.length === 0 || revealAllLoading}
+            >
               <Eye className="h-4 w-4 mr-1" />
-              Reveal All
+              {revealAllLoading
+                ? 'Revealing...'
+                : allFilteredSecretsRevealed
+                ? 'Hide All'
+                : 'Reveal All'}
             </Button>
           </div>
         </div>
@@ -901,20 +1145,39 @@ export default function ProjectSecretsPage() {
         })()}
 
         {/* Secrets Table */}
-        {filteredSecrets.length === 0 ? (
+        {sortedSecrets.length === 0 ? (
           <Card className="border-dashed border-2 border-border bg-card/50">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
                 <Key className="h-5 w-5 text-muted-foreground" />
               </div>
-              <h3 className="text-sm font-semibold text-foreground">No secrets</h3>
-              <p className="mt-1 text-xs text-muted-foreground">Add your first secret</p>
-              {canWrite && (
+              <h3 className="text-sm font-semibold text-foreground">
+                {secrets.length === 0 ? 'No secrets in this environment' : 'No matching secrets'}
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {secrets.length === 0
+                  ? 'Add your first secret to start managing values here.'
+                  : 'Try a different search, filter, or sort combination.'}
+              </p>
+              {secrets.length > 0 ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-4"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setVisibilityFilter('all');
+                    setSortBy('updated-desc');
+                  }}
+                >
+                  Clear filters
+                </Button>
+              ) : canWrite ? (
                 <Button size="sm" className="mt-4" onClick={openAddSecretModal}>
                   <Plus className="h-4 w-4 mr-1" />
                   Add Secret
                 </Button>
-              )}
+              ) : null}
             </CardContent>
           </Card>
         ) : (
@@ -936,9 +1199,11 @@ export default function ProjectSecretsPage() {
 
             {/* Table Body */}
             <div className="divide-y divide-border">
-              {filteredSecrets.map((secret) => (
+              {sortedSecrets.map((secret) => (
                 <div
                   key={secret.id}
+                  data-testid="secret-row"
+                  data-secret-key={secret.key}
                   className={`grid grid-cols-[28px_3fr_2fr_1fr_1fr_1fr_80px] items-center px-4 h-11 cursor-pointer transition-colors hover:bg-muted/50 overflow-hidden ${
                     selectedSecretId === secret.id ? 'bg-gold/5 border-l-2 border-l-gold' : ''
                   }`}
