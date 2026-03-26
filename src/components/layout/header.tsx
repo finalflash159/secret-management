@@ -13,7 +13,7 @@ import {
   ChevronRight,
   Bell,
   LogOut,
-  User,
+  Building2,
   Settings,
   Download,
   Upload,
@@ -164,6 +164,10 @@ function HeaderComponent({ user, organizationSlug, orgRole, unreadAlerts = 0 }: 
   const canExport = Boolean(actions?.getExportSecrets);
   const canAddSecret = Boolean(actions?.onAddSecret);
   const showSecretActions = canImport || canExport || canAddSecret;
+  const organizationHref = organizationSlug
+    ? `/organizations/${organizationSlug}`
+    : '/organizations';
+  const organizationLabel = organizationSlug ? 'Organization' : 'Organizations';
 
   return (
     <>
@@ -298,12 +302,12 @@ function HeaderComponent({ user, organizationSlug, orgRole, unreadAlerts = 0 }: 
                     )}
                   </div>
                   <Link
-                    href={organizationSlug ? `/organizations/${organizationSlug}/settings/profile` : '#'}
+                    href={organizationHref}
                     onClick={() => setShowUserMenu(false)}
                     className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
                   >
-                    <User className="h-4 w-4" />
-                    Profile
+                    <Building2 className="h-4 w-4" />
+                    {organizationLabel}
                   </Link>
                   {(organizationSlug && (orgRole === 'owner' || orgRole === 'admin')) && (
                     <Link

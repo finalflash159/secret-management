@@ -78,6 +78,9 @@ function SidebarComponent({ user, collapsed = false, organizationSlug, orgRole, 
 
   // Build base href based on org slug
   const baseHref = organizationSlug ? `/organizations/${organizationSlug}` : '/organizations';
+  const secretsHref = currentProjectId
+    ? `${baseHref}/projects/${currentProjectId}`
+    : baseHref;
 
   const isAdmin = orgRole === 'owner' || orgRole === 'admin';
 
@@ -89,7 +92,7 @@ function SidebarComponent({ user, collapsed = false, organizationSlug, orgRole, 
       {
         label: 'Project',
         items: [
-          { label: 'Secrets', href: baseHref, icon: <Key className="h-4 w-4" /> },
+          { label: 'Secrets', href: secretsHref, icon: <Key className="h-4 w-4" /> },
           { label: 'Dynamic Secrets', href: `${baseHref}/dynamic-secrets`, icon: <RefreshCw className="h-4 w-4" /> },
           { label: 'Secret Rotation', href: `${baseHref}/secret-rotation`, icon: <RefreshCw className="h-4 w-4" />, badge: 'New' },
           { label: 'Folders', href: `${baseHref}/folders`, icon: <FolderOpen className="h-4 w-4" /> },
@@ -127,7 +130,7 @@ function SidebarComponent({ user, collapsed = false, organizationSlug, orgRole, 
         return true;
       }),
     })).filter(group => group.items.length > 0);
-  }, [baseHref, unreadAlerts, organizationSlug, orgRole, isAdmin, currentProjectId]);
+  }, [baseHref, secretsHref, unreadAlerts, organizationSlug, orgRole, isAdmin, currentProjectId]);
 
   const isActive = useCallback((href: string) => {
     return pathname === href;

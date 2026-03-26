@@ -268,6 +268,19 @@ test.describe('E2E — Admin flows', () => {
     ).toBeVisible({ timeout: 5000 });
   });
 
+  test('Admin sidebar Secrets link preserves the current project context', async ({ page }) => {
+    const projectId = getProjectId();
+
+    await page.goto(`/organizations/${ORG_SLUG}/projects/${projectId}/members`);
+    await page.waitForLoadState('load');
+    await page.waitForTimeout(1500);
+
+    await page.getByRole('link', { name: /^secrets$/i }).click();
+    await expect(page).toHaveURL(
+      new RegExp(`/organizations/${ORG_SLUG}/projects/${projectId}$`)
+    );
+  });
+
   test('Organization alerts page stays org-scoped and mark-all uses the organization id', async ({ page }) => {
     const { organizationId } = readRuntimeFixture();
 
