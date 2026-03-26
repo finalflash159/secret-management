@@ -4,6 +4,8 @@ import { success, unauthorized, error } from '@/backend/utils/api-response';
 import { alertService } from '@/backend/services';
 import { db } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();

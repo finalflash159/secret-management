@@ -288,6 +288,14 @@ test.describe('E2E — Admin flows', () => {
     await page.getByRole('button', { name: /mark all as read/i }).click();
     await markAllResponse;
 
+    const orgAlertsBadge = page
+      .locator(`a[href="/organizations/${ORG_SLUG}/alerts"] span`)
+      .filter({ hasText: /^\d+$/ });
+    await expect(orgAlertsBadge).toHaveCount(0, { timeout: 5000 });
+
+    const globalAlertsBadge = page.locator('a[href="/alerts"] span');
+    await expect(globalAlertsBadge).toHaveText('1', { timeout: 5000 });
+
     const orgUnreadResponse = await page.request.get(
       `/api/alerts?orgId=${organizationId}&read=false`
     );
@@ -311,6 +319,11 @@ test.describe('E2E — Admin flows', () => {
     expect(
       globalUnreadAlerts.some((alert) => alert.title === E2E_GLOBAL_ALERT_TITLE)
     ).toBeTruthy();
+
+    await page.reload();
+    await expect(
+      page.getByRole('button', { name: /mark all as read/i })
+    ).not.toBeVisible({ timeout: 3000 });
   });
 
   test('Organization alerts scope filter keeps pagination for project-scoped alerts', async ({ page }) => {

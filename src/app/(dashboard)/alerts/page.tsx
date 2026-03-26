@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Bell, AlertTriangle, Info, Check, Trash2, Eye, Loader2, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { emitAlertsUpdated } from '@/lib/alert-events';
 
 interface Alert {
   id: string;
@@ -42,7 +43,9 @@ export default function GlobalAlertsPage() {
       if (filter === 'unread') {
         params.set('read', 'false');
       }
-      const res = await fetch(`/api/alerts?${params}`);
+      const res = await fetch(`/api/alerts?${params}`, {
+        cache: 'no-store',
+      });
       if (res.ok) {
         const json = await res.json();
         const data = json?.data;
@@ -58,10 +61,24 @@ export default function GlobalAlertsPage() {
 
   const markAsRead = async (alertId: string) => {
     try {
-      await fetch(`/api/alerts/mark-read?id=${alertId}`, { method: 'POST' });
+      const res = await fetch('/api/alerts/mark-read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alertId }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to mark alert as read');
+      }
+
       setAlerts(alerts.map(a =>
         a.id === alertId ? { ...a, read: true } : a
       ));
+      emitAlertsUpdated();
+
+      if (filter === 'unread') {
+        await fetchAlerts();
+      }
     } catch (err) {
       console.error('Failed to mark as read:', err);
     }
@@ -69,8 +86,19 @@ export default function GlobalAlertsPage() {
 
   const markAllAsRead = async () => {
     try {
-      await fetch('/api/alerts/mark-read', { method: 'POST' });
+      const res = await fetch('/api/alerts/mark-read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ markAll: true }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to mark all alerts as read');
+      }
+
       setAlerts(alerts.map(a => ({ ...a, read: true })));
+      emitAlertsUpdated();
+      await fetchAlerts();
     } catch (err) {
       console.error('Failed to mark all as read:', err);
     }
@@ -78,8 +106,12 @@ export default function GlobalAlertsPage() {
 
   const deleteAlert = async (alertId: string) => {
     try {
-      await fetch(`/api/alerts?id=${alertId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/alerts?id=${alertId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        throw new Error('Failed to delete alert');
+      }
       setAlerts(alerts.filter(a => a.id !== alertId));
+      emitAlertsUpdated();
     } catch (err) {
       console.error('Failed to delete alert:', err);
     }

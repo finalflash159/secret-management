@@ -22,6 +22,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
+import { emitAlertsUpdated } from '@/lib/alert-events';
 import { cn } from '@/lib/utils';
 
 // Alert types matching the backend enum
@@ -264,7 +265,9 @@ export default function AlertsPage() {
       if (filters.read === 'read') params.set('read', 'true');
       else if (filters.read === 'unread') params.set('read', 'false');
 
-      const res = await fetch(`/api/alerts?${params.toString()}`);
+      const res = await fetch(`/api/alerts?${params.toString()}`, {
+        cache: 'no-store',
+      });
       if (!res.ok) {
         throw new Error('Failed to load alerts');
       }
@@ -305,6 +308,8 @@ export default function AlertsPage() {
         setAlerts((prev) =>
           prev.map((a) => (a.id === alertId ? { ...a, read: true, readAt: new Date().toISOString() } : a))
         );
+        emitAlertsUpdated();
+        await fetchAlerts();
         addToast({
           title: 'Alert marked as read',
           variant: 'success',
@@ -328,12 +333,12 @@ export default function AlertsPage() {
 
       if (res.ok) {
         setAlerts((prev) => prev.map((a) => ({ ...a, read: true, readAt: new Date().toISOString() })));
+        emitAlertsUpdated();
+        await fetchAlerts();
         addToast({
           title: 'All alerts marked as read',
           variant: 'success',
         });
-        // Refresh to update count
-        fetchAlerts();
       }
     } catch (err) {
       console.error('Failed to mark all as read:', err);
@@ -350,6 +355,8 @@ export default function AlertsPage() {
       if (res.ok) {
         setAlerts((prev) => prev.filter((a) => a.id !== alertId));
         setTotal((prev) => prev - 1);
+        emitAlertsUpdated();
+        await fetchAlerts();
         addToast({
           title: 'Alert deleted',
           variant: 'success',

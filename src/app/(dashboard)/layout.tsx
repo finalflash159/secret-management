@@ -1,11 +1,12 @@
 'use client';
 
-import { ReactNode, useEffect, useState, useMemo } from 'react';
+import { ReactNode, useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSession } from '@/components/session-provider';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 import { HeaderActionsProvider } from '@/components/layout/header-actions';
+import { ALERTS_UPDATED_EVENT } from '@/lib/alert-events';
 
 type OrgRole = 'owner' | 'admin' | 'member';
 
@@ -17,7 +18,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, loading } = useSession();
-  const [unreadAlerts, setUnreadAlerts] = useState(0);
+  const [globalUnreadAlerts, setGlobalUnreadAlerts] = useState(0);
+  const [orgUnreadAlerts, setOrgUnreadAlerts] = useState(0);
+  const [currentOrgId, setCurrentOrgId] = useState<string | null>(null);
   const [orgRole, setOrgRole] = useState<OrgRole | null>(null);
 
   // Extract org slug and current project id from pathname
@@ -47,44 +50,89 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   useEffect(() => {
     async function fetchOrgRole() {
       if (!currentOrgSlug || !user?.id) {
+        setCurrentOrgId(null);
+        setOrgUnreadAlerts(0);
         setOrgRole(null);
         return;
       }
       try {
-        const res = await fetch(`/api/organizations/${currentOrgSlug}`);
+        const res = await fetch(`/api/organizations/${currentOrgSlug}`, {
+          cache: 'no-store',
+        });
         if (res.ok) {
           const json = await res.json();
           const data = json?.data ?? json;
+          setCurrentOrgId(data?.id ?? null);
           const myMembership = data?.members?.find(
             (m: { userId: string }) => m.userId === user.id
           );
           setOrgRole(myMembership?.role ?? null);
         } else {
+          setCurrentOrgId(null);
+          setOrgUnreadAlerts(0);
           setOrgRole(null);
         }
       } catch {
+        setCurrentOrgId(null);
+        setOrgUnreadAlerts(0);
         setOrgRole(null);
       }
     }
     fetchOrgRole();
   }, [currentOrgSlug, user?.id]);
 
-  // Fetch unread alert count
-  useEffect(() => {
-    async function fetchAlertCount() {
-      if (!user?.id) return;
-      try {
-        const res = await fetch('/api/alerts/unread-count');
-        const json = await res.json();
-        if (json?.data?.count !== undefined) {
-          setUnreadAlerts(json.data.count);
-        }
-      } catch (err) {
-        console.error('Failed to fetch alert count:', err);
-      }
+  const refreshAlertCounts = useCallback(async () => {
+    if (!user?.id) {
+      setGlobalUnreadAlerts(0);
+      setOrgUnreadAlerts(0);
+      return;
     }
-    fetchAlertCount();
-  }, [user?.id]);
+
+    try {
+      const globalResponse = await fetch('/api/alerts/unread-count', {
+        cache: 'no-store',
+      });
+      const globalJson = await globalResponse.json();
+      if (globalJson?.data?.count !== undefined) {
+        setGlobalUnreadAlerts(globalJson.data.count);
+      }
+    } catch (err) {
+      console.error('Failed to fetch global alert count:', err);
+    }
+
+    if (!currentOrgId) {
+      setOrgUnreadAlerts(0);
+      return;
+    }
+
+    try {
+      const orgResponse = await fetch(
+        `/api/alerts/unread-count?orgId=${currentOrgId}`,
+        { cache: 'no-store' }
+      );
+      const orgJson = await orgResponse.json();
+      if (orgJson?.data?.count !== undefined) {
+        setOrgUnreadAlerts(orgJson.data.count);
+      }
+    } catch (err) {
+      console.error('Failed to fetch organization alert count:', err);
+    }
+  }, [currentOrgId, user?.id]);
+
+  useEffect(() => {
+    refreshAlertCounts();
+  }, [refreshAlertCounts]);
+
+  useEffect(() => {
+    function handleAlertsUpdated() {
+      refreshAlertCounts();
+    }
+
+    window.addEventListener(ALERTS_UPDATED_EVENT, handleAlertsUpdated);
+    return () => {
+      window.removeEventListener(ALERTS_UPDATED_EVENT, handleAlertsUpdated);
+    };
+  }, [refreshAlertCounts]);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -114,7 +162,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             organizationSlug={currentOrgSlug}
             orgRole={orgRole}
             currentProjectId={currentProjectId}
-            unreadAlerts={unreadAlerts}
+            unreadAlerts={currentOrgId ? orgUnreadAlerts : globalUnreadAlerts}
           />
         </div>
         <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
@@ -124,7 +172,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               sidebarCollapsed={false}
               organizationSlug={currentOrgSlug}
               orgRole={orgRole}
-              unreadAlerts={unreadAlerts}
+              unreadAlerts={globalUnreadAlerts}
             />
             <main className="flex-1 overflow-hidden">
               <div className="h-full overflow-y-auto p-6">{children}</div>
