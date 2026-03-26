@@ -3,10 +3,27 @@ import {
   E2E_ADMIN_STORAGE_PATH,
   E2E_MEMBER_STORAGE_PATH,
   E2E_ORG_SLUG,
+  E2E_PROJECT_TEMP_EMAIL,
   readRuntimeFixture,
 } from './test-config';
 
 const ORG_SLUG = E2E_ORG_SLUG;
+
+interface ProjectRole {
+  id: string;
+  slug: string;
+  name: string;
+}
+
+interface ProjectMemberRecord {
+  id: string;
+  user: {
+    email: string;
+  };
+  role: {
+    slug: string;
+  };
+}
 
 function getProjectId() {
   return readRuntimeFixture().projectId;
@@ -241,6 +258,76 @@ test.describe('E2E — Admin flows', () => {
     await expect(
       page.getByRole('button', { name: /add secret/i }).first()
     ).toBeVisible({ timeout: 5000 });
+  });
+
+  test('Admin can update and remove project members through nested member routes', async ({ page }) => {
+    const projectId = getProjectId();
+    await page.goto(`/organizations/${ORG_SLUG}/projects/${projectId}`);
+    await page.waitForLoadState('load');
+
+    const rolesResponse = await page.request.get(`/api/projects/${projectId}/roles`);
+    expect(rolesResponse.ok()).toBeTruthy();
+    const rolesJson = await rolesResponse.json();
+    const roles = (rolesJson.data ?? rolesJson) as ProjectRole[];
+    const viewerRole = roles.find((role) => role.slug === 'viewer');
+    const developerRole = roles.find((role) => role.slug === 'developer');
+
+    expect(viewerRole).toBeTruthy();
+    expect(developerRole).toBeTruthy();
+
+    const addResponse = await page.request.post(`/api/projects/${projectId}/members`, {
+      data: {
+        email: E2E_PROJECT_TEMP_EMAIL,
+        roleId: viewerRole!.id,
+      },
+    });
+    expect(addResponse.status()).toBe(201);
+    const addJson = await addResponse.json();
+    const createdMember = (addJson.data ?? addJson) as ProjectMemberRecord;
+    expect(createdMember.user.email).toBe(E2E_PROJECT_TEMP_EMAIL);
+
+    const updateResponse = await page.request.patch(
+      `/api/projects/${projectId}/members/${createdMember.id}`,
+      {
+        data: { roleId: developerRole!.id },
+      }
+    );
+    expect(updateResponse.ok()).toBeTruthy();
+    const updateJson = await updateResponse.json();
+    const updatedMember = (updateJson.data ?? updateJson) as ProjectMemberRecord;
+    expect(updatedMember.role.slug).toBe('developer');
+
+    const membersAfterUpdateResponse = await page.request.get(
+      `/api/projects/${projectId}/members`
+    );
+    expect(membersAfterUpdateResponse.ok()).toBeTruthy();
+    const membersAfterUpdateJson = await membersAfterUpdateResponse.json();
+    const membersAfterUpdate = (
+      membersAfterUpdateJson.data ?? membersAfterUpdateJson
+    ) as ProjectMemberRecord[];
+    const refreshedMember = membersAfterUpdate.find(
+      (member) => member.user.email === E2E_PROJECT_TEMP_EMAIL
+    );
+
+    expect(refreshedMember?.role.slug).toBe('developer');
+
+    const deleteResponse = await page.request.delete(
+      `/api/projects/${projectId}/members/${createdMember.id}`
+    );
+    expect(deleteResponse.ok()).toBeTruthy();
+
+    const membersAfterDeleteResponse = await page.request.get(
+      `/api/projects/${projectId}/members`
+    );
+    expect(membersAfterDeleteResponse.ok()).toBeTruthy();
+    const membersAfterDeleteJson = await membersAfterDeleteResponse.json();
+    const membersAfterDelete = (
+      membersAfterDeleteJson.data ?? membersAfterDeleteJson
+    ) as ProjectMemberRecord[];
+
+    expect(
+      membersAfterDelete.some((member) => member.user.email === E2E_PROJECT_TEMP_EMAIL)
+    ).toBeFalsy();
   });
 });
 

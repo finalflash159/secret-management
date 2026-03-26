@@ -14,6 +14,8 @@ import {
   E2E_ORG_NAME,
   E2E_ORG_SLUG,
   E2E_PROJECT_NAME,
+  E2E_PROJECT_TEMP_EMAIL,
+  E2E_PROJECT_TEMP_PASSWORD,
   E2E_PROJECT_SLUG,
   E2E_RUNTIME_DIR,
 } from './test-config';
@@ -153,6 +155,12 @@ async function ensureFixtureData() {
     'E2E Member',
     false
   );
+  const tempProjectMember = await ensureUser(
+    E2E_PROJECT_TEMP_EMAIL,
+    E2E_PROJECT_TEMP_PASSWORD,
+    'E2E Project Temp',
+    false
+  );
 
   const organization = await prisma.organization.upsert({
     where: { slug: E2E_ORG_SLUG },
@@ -188,6 +196,21 @@ async function ensureFixtureData() {
     update: { role: 'member' },
     create: {
       userId: member.id,
+      orgId: organization.id,
+      role: 'member',
+    },
+  });
+
+  await prisma.orgMember.upsert({
+    where: {
+      userId_orgId: {
+        userId: tempProjectMember.id,
+        orgId: organization.id,
+      },
+    },
+    update: { role: 'member' },
+    create: {
+      userId: tempProjectMember.id,
       orgId: organization.id,
       role: 'member',
     },
@@ -259,6 +282,13 @@ async function ensureFixtureData() {
       userId: member.id,
       projectId: project.id,
       roleId: viewerRole.id,
+    },
+  });
+
+  await prisma.projectMember.deleteMany({
+    where: {
+      projectId: project.id,
+      userId: tempProjectMember.id,
     },
   });
 
