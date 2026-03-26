@@ -191,10 +191,10 @@ export default function MembersPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Members</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Members</h1>
           <p className="text-sm text-muted-foreground">Manage team members and their access</p>
         </div>
         {(userOrgRole === 'owner' || userOrgRole === 'admin') && (
@@ -209,7 +209,7 @@ export default function MembersPage() {
       {createdCode && (
         <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <p className="text-sm font-medium text-foreground">Invitation code created</p>
                 <p className="text-xs text-muted-foreground font-mono mt-1">{createdCode.code}</p>
@@ -253,16 +253,20 @@ export default function MembersPage() {
         <CardContent className="p-0">
           {members.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">
-              <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>No members yet</p>
-              <p className="text-xs">Invite members to collaborate</p>
+              <Users className="mx-auto mb-3 h-8 w-8 opacity-50" />
+              <p className="text-base font-medium text-foreground">No members yet</p>
+              <p className="mt-1 text-sm text-muted-foreground">Invite members to collaborate in this organization.</p>
+              <Button className="mt-4" size="sm" onClick={() => setShowInviteModal(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Invite Member
+              </Button>
             </div>
           ) : (
             <div className="divide-y divide-border">
               {members.map((member) => (
                 <div key={member.id} className="flex items-center justify-between p-4">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                    <div className="flex size-10 items-center justify-center rounded-full bg-muted">
                       <span className="text-sm font-medium">
                         {member.user.name?.charAt(0).toUpperCase() || member.user.email.charAt(0).toUpperCase()}
                       </span>
@@ -281,6 +285,7 @@ export default function MembersPage() {
                     <Button
                       variant="ghost"
                       size="sm"
+                      aria-label={`Remove ${member.user.name || member.user.email}`}
                       onClick={() => setConfirmRemove({ id: member.id, name: member.user.name || member.user.email })}
                       disabled={member.role === 'owner'}
                     >
@@ -309,10 +314,11 @@ export default function MembersPage() {
       >
         <form onSubmit={handleInvite} className="space-y-4">
           {/* Tab Switcher */}
-          <div className="flex border-b border-border mb-4">
+          <div className="mb-4 flex border-b border-border" aria-label="Invitation type">
             <button
               type="button"
               onClick={() => { setInviteType('email'); setInviteRole('member'); }}
+              aria-pressed={inviteType === 'email'}
               className={`flex-1 pb-2 text-sm font-medium border-b-2 transition-colors ${
                 inviteType === 'email'
                   ? 'border-primary text-foreground'
@@ -324,6 +330,7 @@ export default function MembersPage() {
             <button
               type="button"
               onClick={() => { setInviteType('code'); setInviteRole('member'); }}
+              aria-pressed={inviteType === 'code'}
               className={`flex-1 pb-2 text-sm font-medium border-b-2 transition-colors ${
                 inviteType === 'code'
                   ? 'border-primary text-foreground'
@@ -335,7 +342,7 @@ export default function MembersPage() {
           </div>
 
           {error && (
-            <div className="rounded-md bg-danger/10 p-2.5 text-sm text-danger border border-danger/20">
+            <div role="alert" aria-live="polite" className="rounded-md border border-danger/20 bg-danger/10 p-2.5 text-sm text-danger">
               {error}
             </div>
           )}
@@ -395,8 +402,9 @@ export default function MembersPage() {
                   placeholder="Restrict to specific email"
                   value={codeEmail}
                   onChange={(e) => setCodeEmail(e.target.value)}
+                  aria-describedby="code-email-help"
                 />
-                <p className="text-[10px] text-muted-foreground">Leave empty to allow any email address</p>
+                <p id="code-email-help" className="text-xs text-muted-foreground">Leave empty to allow any email address</p>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="codeMaxUses">Max uses</Label>

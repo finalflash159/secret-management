@@ -204,9 +204,9 @@ export default function IntegrationsPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Integrations</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Integrations</h1>
         <p className="text-sm text-muted-foreground">Connect with external services and tools</p>
       </div>
 
@@ -236,8 +236,8 @@ export default function IntegrationsPage() {
                         )}
                       </div>
                       <div>
-                        <p className="text-2xl font-bold text-foreground">{integration.name}</p>
-                        <p className="text-xl text-muted-foreground">
+                        <p className="text-lg font-semibold text-foreground">{integration.name}</p>
+                        <p className="text-sm text-muted-foreground">
                           {integration.lastSyncAt
                             ? `Last sync: ${new Date(integration.lastSyncAt).toLocaleString()}`
                             : 'Never synced'}
@@ -253,6 +253,7 @@ export default function IntegrationsPage() {
                       <Button
                         variant="ghost"
                         size="sm"
+                        aria-label={`Test ${integration.name} connection`}
                         onClick={() => handleTestConnection(integration)}
                         disabled={testing === integration.id}
                       >
@@ -265,6 +266,7 @@ export default function IntegrationsPage() {
                       <Button
                         variant="ghost"
                         size="sm"
+                        aria-label={`Disconnect ${integration.name}`}
                         className="h-9 w-9 p-0 text-muted-foreground hover:text-danger"
                         onClick={() => setConfirmDisconnect(integration)}
                       >
@@ -305,8 +307,8 @@ export default function IntegrationsPage() {
                         className="h-12 w-12"
                       />
                     </div>
-                    <p className="text-xl font-bold text-foreground mt-3">{type.name}</p>
-                    <p className="text-base text-muted-foreground mt-1">{type.description}</p>
+                    <p className="mt-3 text-base font-semibold text-foreground">{type.name}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{type.description}</p>
                     {connected ? (
                       <Button
                         variant="outline"
@@ -322,6 +324,7 @@ export default function IntegrationsPage() {
                         variant="outline"
                         size="sm"
                         className="mt-3 w-full"
+                        aria-label={`Connect ${type.name}`}
                         onClick={() => openCreateModal(type.id)}
                       >
                         <Plus className="h-5 w-5 mr-2" />

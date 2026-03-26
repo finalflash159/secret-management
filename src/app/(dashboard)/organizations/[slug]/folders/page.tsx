@@ -291,14 +291,15 @@ export default function FoldersPage() {
     return (
       <div key={folder.id}>
         <div
-          className="flex items-center gap-2 py-2.5 px-3 rounded-lg hover:bg-muted cursor-pointer group"
+          className="group flex items-center gap-2 rounded-lg px-3 py-2.5 hover:bg-muted"
           style={{ paddingLeft: `${level * 24 + 12}px` }}
-          onClick={() => hasChildren && toggleFolder(folder.id)}
         >
           {hasChildren ? (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); toggleFolder(folder.id); }}
+              aria-label={`${isExpanded ? 'Collapse' : 'Expand'} folder ${folder.name}`}
+              aria-expanded={isExpanded}
               className="p-1 hover:bg-muted-foreground/20 rounded"
             >
               {isExpanded ? (
@@ -308,17 +309,18 @@ export default function FoldersPage() {
               )}
             </button>
           ) : (
-            <span className="w-6" />
+            <span className="w-6" aria-hidden="true" />
           )}
           <Folder className="h-5 w-5 text-muted-foreground" />
           <span className="text-base text-foreground flex-1 font-medium">{folder.name}</span>
-          <span className="text-xs text-muted-foreground mr-2">
+          <span className="mr-2 text-xs tabular-nums text-muted-foreground">
             {folder._count?.secrets || 0} secrets
           </span>
-          <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
             <Button
               variant="ghost"
               size="sm"
+              aria-label={`Edit folder ${folder.name}`}
               className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
               onClick={() => openEditModal(folder)}
             >
@@ -327,6 +329,7 @@ export default function FoldersPage() {
             <Button
               variant="ghost"
               size="sm"
+              aria-label={`Delete folder ${folder.name}`}
               className="h-7 w-7 p-0 text-muted-foreground hover:text-danger"
               onClick={() => setConfirmDeleteFolder(folder)}
             >
@@ -368,10 +371,10 @@ export default function FoldersPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Folders</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Folders</h1>
           <p className="text-sm text-muted-foreground">Organize your secrets in folders</p>
         </div>
         <Button onClick={() => setShowCreateModal(true)} disabled={!selectedProject || !selectedEnv}>
@@ -381,7 +384,7 @@ export default function FoldersPage() {
       </div>
 
       {/* Project & Environment Selectors */}
-      <div className="flex gap-4">
+      <div className="grid gap-4 md:grid-cols-2">
         <div className="flex-1">
           <Label htmlFor="project">Project</Label>
           <select
@@ -430,9 +433,13 @@ export default function FoldersPage() {
             </div>
           ) : folderTree.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">
-              <Folder className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>No folders yet</p>
-              <p className="text-xs">Create a folder to organize your secrets</p>
+              <Folder className="mx-auto mb-3 h-8 w-8 opacity-50" />
+              <p className="text-base font-medium text-foreground">No folders yet</p>
+              <p className="mt-1 text-sm text-muted-foreground">Create a folder to organize your secrets.</p>
+              <Button className="mt-4" size="sm" onClick={() => setShowCreateModal(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                New Folder
+              </Button>
             </div>
           ) : (
             <div className="space-y-0">
