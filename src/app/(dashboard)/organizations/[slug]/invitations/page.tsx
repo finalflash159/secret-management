@@ -238,9 +238,9 @@ export default function InvitationsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Invitations</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Invitations</h1>
           <p className="text-sm text-muted-foreground">Manage invitation codes for your organization</p>
         </div>
         {(userOrgRole === 'owner' || userOrgRole === 'admin') && (
@@ -252,34 +252,34 @@ export default function InvitationsPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
         <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-foreground">{stats.total}</div>
+            <div className="text-2xl font-bold tabular-nums text-foreground">{stats.total}</div>
             <div className="text-xs text-muted-foreground">Total</div>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-green-500">{stats.active}</div>
+            <div className="text-2xl font-bold tabular-nums text-green-500">{stats.active}</div>
             <div className="text-xs text-muted-foreground">Active</div>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-500">{stats.used}</div>
+            <div className="text-2xl font-bold tabular-nums text-blue-500">{stats.used}</div>
             <div className="text-xs text-muted-foreground">Used</div>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-yellow-500">{stats.expired}</div>
+            <div className="text-2xl font-bold tabular-nums text-yellow-500">{stats.expired}</div>
             <div className="text-xs text-muted-foreground">Expired</div>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-red-500">{stats.revoked}</div>
+            <div className="text-2xl font-bold tabular-nums text-red-500">{stats.revoked}</div>
             <div className="text-xs text-muted-foreground">Revoked</div>
           </CardContent>
         </Card>
@@ -290,9 +290,13 @@ export default function InvitationsPage() {
         <CardContent className="p-0">
           {invitations.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">
-              <Mail className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>No invitations yet</p>
-              <p className="text-xs">Create an invitation to invite members</p>
+              <Mail className="mx-auto mb-3 h-8 w-8 opacity-50" />
+              <p className="text-base font-medium text-foreground">No invitations yet</p>
+              <p className="mt-1 text-sm text-muted-foreground">Create an invitation to onboard teammates into this organization.</p>
+              <Button className="mt-4" size="sm" onClick={() => setShowCreateModal(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Create Invitation
+              </Button>
             </div>
           ) : (
             <div className="divide-y divide-border">
@@ -351,6 +355,7 @@ export default function InvitationsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          aria-label={`Copy invitation code ${invitation.code}`}
                           onClick={() => copyToClipboard(invitation.code)}
                           title="Copy code"
                         >
@@ -359,6 +364,7 @@ export default function InvitationsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          aria-label={`Copy invite link for ${invitation.code}`}
                           onClick={() => copyInviteLink(invitation.code)}
                           title="Copy invite link"
                         >
@@ -367,6 +373,7 @@ export default function InvitationsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          aria-label={`Regenerate invitation code ${invitation.code}`}
                           onClick={() => setConfirmRegenerate(invitation.id)}
                           title="Regenerate code"
                           disabled={invitation.isRevoked}
@@ -376,6 +383,7 @@ export default function InvitationsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          aria-label={`Revoke invitation code ${invitation.code}`}
                           onClick={() => setConfirmRevoke(invitation.id)}
                           title="Revoke"
                           disabled={invitation.isRevoked}
@@ -417,8 +425,9 @@ export default function InvitationsPage() {
               placeholder="Restrict to specific email"
               value={formEmail}
               onChange={(e) => setFormEmail(e.target.value)}
+              aria-describedby="invitation-email-help"
             />
-            <p className="text-[10px] text-muted-foreground">Leave empty to allow any email address</p>
+            <p id="invitation-email-help" className="text-xs text-muted-foreground">Leave empty to allow any email address</p>
           </div>
 
           <div className="space-y-1.5">

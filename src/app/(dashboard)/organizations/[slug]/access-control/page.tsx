@@ -292,9 +292,9 @@ export default function AccessControlPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Access Control</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Access Control</h1>
           <p className="text-sm text-muted-foreground">Manage roles and permissions for your projects</p>
         </div>
         <Button onClick={() => setShowCreateModal(true)} disabled={!selectedProject}>
@@ -339,7 +339,7 @@ export default function AccessControlPage() {
             {allPermissions.map((perm) => (
               <div key={perm.name} className="py-2 px-3 rounded-lg bg-muted/50">
                 <code className="text-xs text-foreground font-mono">{perm.name}</code>
-                <p className="text-[10px] text-muted-foreground">{perm.description}</p>
+                <p className="text-xs text-muted-foreground">{perm.description}</p>
               </div>
             ))}
           </div>
@@ -362,8 +362,12 @@ export default function AccessControlPage() {
         <Card className="bg-card border-border">
           <CardContent className="p-8 text-center">
             <Folder className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
-            <p className="text-sm text-muted-foreground">No custom roles yet</p>
-            <p className="text-xs text-muted-foreground">Create a role to manage access</p>
+            <p className="text-base font-medium text-foreground">No custom roles yet</p>
+            <p className="mt-1 text-sm text-muted-foreground">Create a role to manage access for this project.</p>
+            <Button className="mt-4" size="sm" onClick={() => setShowCreateModal(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              New Role
+            </Button>
           </CardContent>
         </Card>
       ) : (
@@ -382,12 +386,12 @@ export default function AccessControlPage() {
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium text-foreground">{role.name}</span>
                           {isSystem && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                            <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                               System
                             </span>
                           )}
                           {role.isDefault && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                            <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">
                               Default
                             </span>
                           )}
@@ -406,6 +410,7 @@ export default function AccessControlPage() {
                           <Button
                             variant="ghost"
                             size="sm"
+                            aria-label={`Edit role ${role.name}`}
                             className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
                             onClick={() => openEditModal(role)}
                           >
@@ -414,6 +419,7 @@ export default function AccessControlPage() {
                           <Button
                             variant="ghost"
                             size="sm"
+                            aria-label={`Delete role ${role.name}`}
                             className="h-8 w-8 p-0 text-muted-foreground hover:text-danger"
                             onClick={() => setConfirmDeleteRole(role)}
                           >
@@ -428,7 +434,7 @@ export default function AccessControlPage() {
                       {getRolePermissions(role).map((perm) => (
                         <span
                           key={perm}
-                          className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono"
+                          className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-muted-foreground"
                         >
                           {perm}
                         </span>
@@ -462,9 +468,10 @@ export default function AccessControlPage() {
               value={roleSlug}
               onChange={(e) => setRoleSlug(e.target.value)}
               placeholder="qa-engineer"
+              aria-describedby="role-slug-help"
               required
             />
-            <p className="text-[10px] text-muted-foreground">URL-friendly identifier (lowercase, no spaces)</p>
+            <p id="role-slug-help" className="text-xs text-muted-foreground">URL-friendly identifier (lowercase, no spaces)</p>
           </div>
           <div className="space-y-1.5">
             <Label>Permissions</Label>
@@ -523,9 +530,10 @@ export default function AccessControlPage() {
               id="editSlug"
               value={roleSlug}
               disabled
+              aria-describedby="edit-role-slug-help"
               className="bg-muted"
             />
-            <p className="text-[10px] text-muted-foreground">Slug cannot be changed</p>
+            <p id="edit-role-slug-help" className="text-xs text-muted-foreground">Slug cannot be changed</p>
           </div>
           <div className="space-y-1.5">
             <Label>Permissions</Label>

@@ -546,10 +546,10 @@ export default function DynamicSecretsPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-foreground">Dynamic Secrets</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Dynamic Secrets</h1>
           <p className="text-sm text-muted-foreground">Automatically generated credentials that rotate periodically</p>
         </div>
         <div className="flex gap-2">
@@ -571,6 +571,7 @@ export default function DynamicSecretsPage() {
       <div className="flex gap-1 border-b border-border">
         <button
           onClick={() => setActiveTab('secrets')}
+          aria-pressed={activeTab === 'secrets'}
           className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
             activeTab === 'secrets'
               ? 'border-primary text-primary'
@@ -581,6 +582,7 @@ export default function DynamicSecretsPage() {
         </button>
         <button
           onClick={() => setActiveTab('rotation')}
+          aria-pressed={activeTab === 'rotation'}
           className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
             activeTab === 'rotation'
               ? 'border-primary text-primary'
@@ -592,7 +594,7 @@ export default function DynamicSecretsPage() {
       </div>
 
       {/* Project & Environment Selectors */}
-      <div className="flex gap-4">
+      <div className={`grid gap-4 ${activeTab === 'secrets' ? 'md:grid-cols-2' : 'md:grid-cols-1'}`}>
         <div className="flex-1">
           <Label htmlFor="project">Project</Label>
           <select
@@ -644,9 +646,13 @@ export default function DynamicSecretsPage() {
               </div>
             ) : dynamicSecrets.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
-                <Key className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>No dynamic secrets yet</p>
-                <p className="text-xs">Create a dynamic secret to generate rotating credentials</p>
+                <Key className="mx-auto mb-3 h-8 w-8 opacity-50" />
+                <p className="text-base font-medium text-foreground">No dynamic secrets yet</p>
+                <p className="mt-1 text-sm text-muted-foreground">Create a dynamic secret to generate rotating credentials.</p>
+                <Button className="mt-4" size="sm" onClick={() => setShowCreateModal(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Dynamic Secret
+                </Button>
               </div>
             ) : (
               <div className="space-y-3">
@@ -682,6 +688,7 @@ export default function DynamicSecretsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          aria-label={`View credentials for ${secret.name}`}
                           className="h-8 w-8 p-0"
                           onClick={() => handleViewCredentials(secret)}
                           title="View credentials"
@@ -691,6 +698,7 @@ export default function DynamicSecretsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          aria-label={`Rotate credentials for ${secret.name}`}
                           className="h-8 w-8 p-0"
                           onClick={() => handleRotate(secret)}
                           disabled={rotating === secret.id}
@@ -705,6 +713,7 @@ export default function DynamicSecretsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          aria-label={`Delete dynamic secret ${secret.name}`}
                           className="h-8 w-8 p-0 text-muted-foreground hover:text-danger"
                           onClick={() => setConfirmDeleteSecret(secret)}
                           title="Delete"
@@ -732,9 +741,20 @@ export default function DynamicSecretsPage() {
               </div>
             ) : rotationJobs.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
-                <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>No rotation jobs yet</p>
-                <p className="text-xs">Create a rotation job to automate credential rotation</p>
+                <Clock className="mx-auto mb-3 h-8 w-8 opacity-50" />
+                <p className="text-base font-medium text-foreground">No rotation jobs yet</p>
+                <p className="mt-1 text-sm text-muted-foreground">Create a rotation job to automate credential rotation.</p>
+                {dynamicSecrets.length === 0 ? (
+                  <Button className="mt-4" size="sm" variant="outline" onClick={() => setActiveTab('secrets')}>
+                    <Key className="mr-2 h-4 w-4" />
+                    Create a Dynamic Secret First
+                  </Button>
+                ) : (
+                  <Button className="mt-4" size="sm" onClick={() => setShowRotationModal(true)}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    New Rotation Job
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
@@ -778,6 +798,7 @@ export default function DynamicSecretsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          aria-label={`${job.isActive ? 'Pause' : 'Enable'} rotation job ${job.name}`}
                           className="h-8 w-8 p-0"
                           onClick={() => handleToggleJob(job)}
                           title={job.isActive ? 'Pause' : 'Enable'}
@@ -791,6 +812,7 @@ export default function DynamicSecretsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          aria-label={`Run rotation job ${job.name} now`}
                           className="h-8 w-8 p-0"
                           onClick={() => handleRunJobNow(job)}
                           disabled={rotating === job.id}
@@ -805,6 +827,7 @@ export default function DynamicSecretsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
+                          aria-label={`Delete rotation job ${job.name}`}
                           className="h-8 w-8 p-0 text-muted-foreground hover:text-danger"
                           onClick={() => setConfirmDeleteJob(job)}
                         >
@@ -848,6 +871,8 @@ export default function DynamicSecretsPage() {
                     key={provider.id}
                     type="button"
                     onClick={() => handleProviderChange(provider.id)}
+                    aria-pressed={secretProvider === provider.id}
+                    aria-label={`Use ${provider.name} as provider`}
                     className={`p-3 rounded-lg border text-center transition-colors ${
                       secretProvider === provider.id
                         ? 'border-primary bg-primary/10'
@@ -1024,6 +1049,7 @@ export default function DynamicSecretsPage() {
                   <Button
                     variant="ghost"
                     size="sm"
+                    aria-label="Copy username"
                     className="h-7 w-7 p-0"
                     onClick={() => handleCopyToClipboard(credentials.username, 'username')}
                   >
@@ -1045,6 +1071,7 @@ export default function DynamicSecretsPage() {
                     <Button
                       variant="ghost"
                       size="sm"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
                       className="h-7 w-7 p-0"
                       onClick={() => setShowPassword(!showPassword)}
                     >
@@ -1053,6 +1080,7 @@ export default function DynamicSecretsPage() {
                     <Button
                       variant="ghost"
                       size="sm"
+                      aria-label="Copy password"
                       className="h-7 w-7 p-0"
                       onClick={() => handleCopyToClipboard(credentials.password, 'password')}
                     >
