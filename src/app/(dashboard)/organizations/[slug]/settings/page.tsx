@@ -103,10 +103,31 @@ export default function SettingsPage() {
   };
 
   const sections = [
-    { icon: Settings, name: 'General Settings', description: 'Organization name and details', href: null, action: null },
-    { icon: Users, name: 'Members', description: 'Team members and roles', href: `/organizations/${slug}/members`, action: null },
-    { icon: Mail, name: 'Invitations', description: 'Manage invitation codes', href: `/organizations/${slug}/invitations`, action: null },
-    { icon: CreditCard, name: 'Billing', description: 'Plans and payment methods', href: `/organizations/${slug}/billing`, action: null },
+    {
+      icon: Settings,
+      name: 'General Settings',
+      description: 'Organization name and details',
+      href: `/organizations/${slug}/settings`,
+      current: true,
+    },
+    {
+      icon: Users,
+      name: 'Members',
+      description: 'Team members and roles',
+      href: `/organizations/${slug}/members`,
+    },
+    {
+      icon: Mail,
+      name: 'Invitations',
+      description: 'Manage invitation codes',
+      href: `/organizations/${slug}/invitations`,
+    },
+    {
+      icon: CreditCard,
+      name: 'Billing',
+      description: 'Plans and payment methods',
+      href: `/organizations/${slug}/billing`,
+    },
   ];
 
   if (loading) {
@@ -200,11 +221,14 @@ export default function SettingsPage() {
         <h2 className="text-sm font-semibold text-foreground mb-3">Quick Links</h2>
         <div className="grid gap-4 md:grid-cols-2">
           {sections.map((section) => (
-            <Link key={section.name} href={section.href || '#'}>
-              <Card className="bg-card border-border hover:border-border-hover cursor-pointer transition-colors">
+            section.current ? (
+              <Card
+                key={section.name}
+                className="bg-card border-border-hover ring-1 ring-border-hover"
+              >
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <section.icon className="h-5 w-5 text-muted-foreground" />
+                    <section.icon className="h-5 w-5 text-foreground" />
                     <div>
                       <h3 className="font-medium text-foreground">{section.name}</h3>
                       <p className="text-xs text-muted-foreground">{section.description}</p>
@@ -212,7 +236,21 @@ export default function SettingsPage() {
                   </div>
                 </CardContent>
               </Card>
-            </Link>
+            ) : (
+              <Link key={section.name} href={section.href}>
+                <Card className="bg-card border-border hover:border-border-hover cursor-pointer transition-colors">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <section.icon className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <h3 className="font-medium text-foreground">{section.name}</h3>
+                        <p className="text-xs text-muted-foreground">{section.description}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            )
           ))}
         </div>
       </div>
