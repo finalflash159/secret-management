@@ -546,6 +546,80 @@ test.describe('E2E — Admin flows', () => {
       }
     }
   });
+
+  test('Secret controls support sort and reveal-all on the project page', async ({ page }) => {
+    const projectId = getProjectId();
+    let createdSecretIds: string[] = [];
+
+    const environmentsResponse = await page.request.get(
+      `/api/projects/${projectId}/environments`
+    );
+    expect(environmentsResponse.ok()).toBeTruthy();
+    const environmentsJson = await environmentsResponse.json();
+    const environments = (environmentsJson.data ?? environmentsJson) as Array<{
+      id: string;
+    }>;
+    const envId = environments[0]?.id;
+
+    expect(envId).toBeTruthy();
+
+    try {
+      const suffix = Date.now().toString().slice(-6);
+      const alphaKey = `AFFORD_${suffix}_ALPHA`;
+      const omegaKey = `AFFORD_${suffix}_OMEGA`;
+      const alphaValue = `alpha-${suffix}`;
+      const omegaValue = `omega-${suffix}`;
+
+      for (const [key, value] of [
+        [alphaKey, alphaValue],
+        [omegaKey, omegaValue],
+      ] as const) {
+        const createResponse = await page.request.post(
+          `/api/projects/${projectId}/secrets`,
+          {
+            data: { key, value, envId },
+          }
+        );
+
+        expect(createResponse.status()).toBe(201);
+        const createJson = await createResponse.json();
+        const createdSecret = (createJson.data ?? createJson) as { id: string };
+        createdSecretIds.push(createdSecret.id);
+      }
+
+      await page.goto(`/organizations/${ORG_SLUG}/projects/${projectId}`);
+      await page.waitForLoadState('load');
+      await page.waitForTimeout(2000);
+
+      await page.getByTestId('secret-search').fill(`AFFORD_${suffix}`);
+      await page.getByTestId('secret-sort').selectOption('key-desc');
+
+      const rows = page.getByTestId('secret-row');
+      await expect(rows).toHaveCount(2);
+      await expect(rows.first()).toContainText(omegaKey);
+
+      await page.getByTestId('reveal-all-secrets').click();
+      await expect(page.getByTestId('reveal-all-secrets')).toContainText('Hide All');
+      await expect(rows.first()).toContainText(omegaValue);
+      await expect(rows.nth(1)).toContainText(alphaValue);
+
+      await page.getByTestId('secret-filter').selectOption('revealed');
+      await expect(rows).toHaveCount(2);
+
+      await page.getByTestId('reveal-all-secrets').click();
+      await expect(page.getByTestId('reveal-all-secrets')).toContainText('Reveal All');
+
+      await page.getByTestId('secret-filter').selectOption('hidden');
+      await expect(rows).toHaveCount(2);
+    } finally {
+      await Promise.all(
+        createdSecretIds.map(async (secretId) => {
+          const deleteResponse = await page.request.delete(`/api/secrets/${secretId}`);
+          expect(deleteResponse.ok()).toBeTruthy();
+        })
+      );
+    }
+  });
 });
 
 test.describe('E2E — Member flows', () => {
